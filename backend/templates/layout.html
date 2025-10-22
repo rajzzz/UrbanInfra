@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ title or 'Delhi Urban Analysis' }}</title>
+    <base href="{{ request.url_root }}" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-css-reset@1.4.0/dist/reset.min.css" />
+    <style>
+      body {
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        background: #f4f6f8;
+        color: #0b1f33;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
+      .page {
+        width: min(960px, 100%);
+        margin: 64px 16px;
+        background: #ffffff;
+        border-radius: 18px;
+        box-shadow: 0 22px 45px -24px rgba(15, 37, 61, 0.3);
+        padding: 32px clamp(24px, 4vw, 48px);
+      }
+      header {
+        margin-bottom: 28px;
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(1.8rem, 2.2vw, 2.4rem);
+        color: #0c3d64;
+      }
+      p.lead {
+        margin-top: 12px;
+        color: #4c5d6c;
+        line-height: 1.5;
+      }
+      form {
+        display: grid;
+        gap: 18px;
+      }
+      label {
+        font-weight: 600;
+        color: #15324c;
+      }
+      textarea,
+      input,
+      select {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid #d1d9e0;
+        background: #faffff;
+        font-size: 0.95rem;
+      }
+      input[type="file"] {
+        padding: 12px 0;
+        border: none;
+        background: transparent;
+      }
+      button {
+        justify-self: start;
+        background: linear-gradient(135deg, #166086, #1983a1);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 12px 26px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 24px -18px rgba(16, 73, 112, 0.8);
+      }
+      .metrics {
+        display: grid;
+        gap: 16px;
+      }
+      .card {
+        padding: 18px 22px;
+        border-radius: 16px;
+        border: 1px solid rgba(18, 56, 90, 0.08);
+        background: linear-gradient(135deg, rgba(19, 85, 130, 0.05), #ffffff);
+      }
+      .card h2 {
+        font-size: 1.1rem;
+        margin-bottom: 10px;
+        color: #124362;
+      }
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+      }
+      .meta-item {
+        padding: 14px;
+        border-radius: 14px;
+        background: rgba(16, 98, 123, 0.07);
+      }
+      .flash {
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: rgba(204, 48, 58, 0.12);
+        color: #9f1d2a;
+        margin-bottom: 18px;
+      }
+      ul {
+        padding-left: 20px;
+      }
+      .trees-list li {
+        margin-bottom: 8px;
+      }
+      footer {
+        margin-top: 36px;
+        font-size: 0.85rem;
+        color: #688195;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      {% if get_flashed_messages(with_categories=true) %} {% for category, message in get_flashed_messages(with_categories=true) %}
+      <div class="flash">{{ message }}</div>
+      {% endfor %} {% endif %} {% block content %}{% endblock %}
+      <footer>Built for Delhi ward-level sustainable planning.</footer>
+    </div>
+  </body>
+</html>

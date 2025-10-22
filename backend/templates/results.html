@@ -1,0 +1,78 @@
+{% extends "layout.html" %} {% block content %}
+<header>
+  <h1>Ward Insights</h1>
+  <p class="lead">Greenery, population context, and nature-based suggestions for this ward. Review the findings and tell us what kind of construction youd like to plan next.</p>
+</header>
+<section class="metrics">
+  <div class="card">
+    <h2>Satellite Snapshot</h2>
+    {% if image_url %}
+    <img src="{{ image_url }}" alt="Satellite view of ward" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08)" />
+    {% elif image_error %}
+    <p style="margin: 0">{{ image_error }}</p>
+    {% else %}
+    <p style="margin: 0">Satellite snapshot unavailable for this ward.</p>
+    {% endif %}
+  </div>
+  <div class="card">
+    <h2>Greenery Score</h2>
+    <p style="font-size: 2.4rem; font-weight: 700; color: #0a6f4f">{{ greenery.greenery_score if greenery else 'N/A' }}</p>
+    <p>{{ greenery.greenery_summary }}</p>
+  </div>
+  <div class="card">
+    <h2>Population Context</h2>
+    <p>{{ greenery.population_context }}</p>
+  </div>
+  <div class="card">
+    <h2>AI Observations</h2>
+    <ul>
+      {% for note in greenery.observations %}
+      <li>{{ note }}</li>
+      {% else %}
+      <li>No observations returned.</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="card">
+    <h2>Tree Planting Ideas</h2>
+    <ul class="trees-list">
+      {% for tree in tree_suggestions %}
+      <li>{{ tree }}</li>
+      {% else %}
+      <li>No tree suggestions available.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="card" style="margin-top: 24px">
+  <h2>Ward Metadata</h2>
+  <div class="meta-grid">
+    {% for key, value in metadata.items() if key not in ['coordinates', 'map_view', 'ward_geojson'] %}
+    <div class="meta-item">
+      <strong>{{ key|replace('_', ' ')|title }}</strong>
+      <div style="margin-top: 6px">{{ value }}</div>
+    </div>
+    {% else %}
+    <p>No metadata provided.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<form action="{{ url_for('main.recommend') }}" method="post" class="card" style="margin-top: 28px">
+  <h2>Need a construction plan?</h2>
+  <p style="color: #3f5665; line-height: 1.5">Tell us what youre planning to build. Well combine the greenery insights, SDG 11 targets, and DDA rules to suggest micro-locations and next steps.</p>
+  <label for="construction_type">Construction type</label>
+  <input id="construction_type" type="text" name="construction_type" placeholder="e.g., community clinic, senior housing, riverfront park" required value="{{ construction_type or '' }}" />
+  <button type="submit">Generate recommendations</button>
+</form>
+
+{% if recommendations_html %}
+<section class="card" style="margin-top: 28px">
+  <h2>AI Construction Guidance</h2>
+  <div class="markdown-body">{{ recommendations_html|safe }}</div>
+</section>
+{% endif %}
+
+<a href="http://127.0.0.1:5001" style="display: inline-block; margin-top: 24px"> ⬅back to new analysis </a>
+{% endblock %}

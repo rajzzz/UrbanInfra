@@ -1,0 +1,26 @@
+{% extends "layout.html" %} {% block content %}
+<header>
+  <h1>Delhi Ward Greenery Assessor</h1>
+  <p class="lead">
+    Upload a recent satellite image and paste the ward metadata JSON. We'll compute a greenery score with Gemini, find suitable Delhi trees via Perplexity, and help you plan people-positive
+    infrastructure aligned with SDG 11.
+  </p>
+</header>
+<form action="{{ url_for('analyze') }}" method="post" enctype="multipart/form-data">
+  <div>
+    <label for="satellite_image">Satellite image</label>
+    <input id="satellite_image" type="file" name="satellite_image" accept="image/png,image/jpeg,image/jpg,image/webp" required />
+  </div>
+  <div>
+    <label for="metadata_json">Ward metadata (JSON)</label>
+    <textarea
+      id="metadata_json"
+      name="metadata_json"
+      rows="8"
+      placeholder='{"ward_id": "123", "area_sq_km": 4.2, "population": 89000, "density": 21200, "bounds": {"type": "Polygon", "coordinates": [...]}}'
+      required
+    ></textarea>
+  </div>
+  <button type="submit">Analyze ward</button>
+</form>
+{% endblock %}
