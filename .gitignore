@@ -2,5 +2,7 @@
 ./backend/instance/
 ./backend/__pycache__/
 ./backend/venv/
+instance/
+__pycache__/
 
-
+notes/
