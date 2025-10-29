@@ -416,6 +416,9 @@ async function initMap() {
   // Provide analyze handler: the UI's Analyze button will call this with a google.maps.Data.Feature
   if (infoPanel && typeof infoPanel.setAnalyzeHandler === "function") {
     infoPanel.setAnalyzeHandler((feature) => {
+      // Show loader immediately when analyze button is clicked
+      showLoader("Preparing ward for analysis...", 5);
+      
       // If the feature is a raw GeoJSON object (from wardDataGeoJson), convert it by adding to map.data
       try {
         // If it's already a google.maps.Data.Feature, show it directly
@@ -427,6 +430,7 @@ async function initMap() {
         }
       } catch (err) {
         console.error("Analyze handler error:", err);
+        hideLoader();
       }
     });
   }
@@ -507,7 +511,8 @@ function showSingleWard(wardFeature) {
 // Capture Ward Screenshot + Metadata
 // =====================================
 async function captureAndProcessWard(wardFeature) {
-  showLoader("Preparing ward metadata...", 10);
+  // Loader is already shown by analyze handler, now start the phases and update progress
+  setLoaderProgress(5, "Preparing ward metadata...");
   startLoaderPhases();
 
   try {
@@ -547,8 +552,10 @@ async function captureAndProcessWard(wardFeature) {
     console.log("⏩ Skipping canvas capture - using backend Static Maps API for reliable satellite imagery");
 
     setLoaderProgress(Math.max(loaderProgress, 35), "Sending data to backend...");
+    console.log("Starting analysis submission at", new Date().toISOString());
 
     const redirectPath = await submitWardForAnalysis(metadata, imageFile);
+    console.log("Analysis submission completed at", new Date().toISOString());
     const redirectUrl = new URL(redirectPath, BACKEND_BASE_URL).toString();
     console.log("✅ Analysis request accepted. Redirecting to results:", redirectUrl);
 
@@ -558,12 +565,24 @@ async function captureAndProcessWard(wardFeature) {
     }, 250);
   } catch (err) {
     console.error("Failed to capture or send data:", err?.message || err);
+    const errorMessage = err?.message || "Unknown error occurred";
+    
+    // Update loader with specific error message
+    if (errorMessage.includes("timeout")) {
+      setLoaderProgress(90, "Analysis is taking longer than expected. Please wait...");
+    } else {
+      setLoaderProgress(90, `Error: ${errorMessage}. Attempting recovery...`);
+    }
+    
     // Try a non-blocking fallback: request latest analysis page from backend and redirect there if available.
     (async () => {
       try {
         const latestUrl = new URL("/analysis/latest", BACKEND_BASE_URL).toString();
-        setLoaderProgress(Math.max(loaderProgress, 90), "Attempting fallback...");
-        const resp = await fetch(latestUrl, { method: "GET", credentials: "include" });
+        setLoaderProgress(Math.max(loaderProgress, 92), "Checking for previous analysis...");
+        const fallbackController = new AbortController();
+        const fallbackTimeout = setTimeout(() => fallbackController.abort(), 5000);
+        const resp = await fetch(latestUrl, { method: "GET", credentials: "include", signal: fallbackController.signal });
+        clearTimeout(fallbackTimeout);
         if (resp && resp.ok) {
           console.warn("Redirecting to latest analysis as fallback after error");
           setLoaderProgress(100, "Redirecting to last analysis...");
@@ -575,15 +594,23 @@ async function captureAndProcessWard(wardFeature) {
       }
 
       // If fallback didn't work, show a single non-blocking alert as last resort
-      setLoaderProgress(100, "Could not process ward. Please try again.");
-      setTimeout(() => hideLoader(), 1000);
-      alert("Could not process ward. Please check the console.");
+      setLoaderProgress(100, `Error: ${errorMessage}`);
+      setTimeout(() => {
+        hideLoader();
+        alert(`Analysis failed: ${errorMessage}\n\nPlease check your connection and try again.`);
+      }, 1500);
     })();
   }
 }
 
 async function submitWardForAnalysis(metadata, imageFile) {
+  const REQUEST_TIMEOUT = 180000; // 3 minutes timeout
   let response;
+  let abortController = new AbortController();
+  let timeoutId = setTimeout(() => {
+    abortController.abort();
+  }, REQUEST_TIMEOUT);
+
   try {
     const requestUrl = `${BACKEND_BASE_URL}/analyze`;
     const metadataPreview = {
@@ -627,6 +654,7 @@ async function submitWardForAnalysis(metadata, imageFile) {
       }
       console.log("FormData payload", formDataSummary);
 
+      console.log("Sending FormData request at", new Date().toISOString());
       response = await fetch(requestUrl, {
         method: "POST",
         credentials: "include",
@@ -634,7 +662,9 @@ async function submitWardForAnalysis(metadata, imageFile) {
           Accept: "application/json",
         },
         body: formData,
+        signal: abortController.signal,
       });
+      console.log("Received response at", new Date().toISOString(), "Status:", response.status);
     } else {
       const jsonBody = JSON.stringify({ metadata });
       console.log("JSON payload", {
@@ -642,6 +672,7 @@ async function submitWardForAnalysis(metadata, imageFile) {
         bodyPreview: jsonBody.slice(0, 4000),
       });
 
+      console.log("Sending JSON request at", new Date().toISOString());
       response = await fetch(requestUrl, {
         method: "POST",
         credentials: "include",
@@ -650,9 +681,17 @@ async function submitWardForAnalysis(metadata, imageFile) {
           "Content-Type": "application/json",
         },
         body: jsonBody,
+        signal: abortController.signal,
       });
+      console.log("Received response at", new Date().toISOString(), "Status:", response.status);
     }
+    
+    clearTimeout(timeoutId);
   } catch (networkError) {
+    clearTimeout(timeoutId);
+    if (networkError.name === 'AbortError') {
+      throw new Error("Request timeout: The analysis is taking too long. Please try again or contact support.");
+    }
     throw new Error("Unable to reach backend at " + BACKEND_BASE_URL + ": " + networkError.message);
   }
   // Try to parse JSON body (may fail)

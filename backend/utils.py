@@ -268,6 +268,37 @@ def parse_numbered_list(content: str) -> List[str]:
             suggestions.append(m2.group(1).strip())
     return suggestions or [content.strip()]
 
+def strip_reference_citations(text: Optional[str]) -> str:
+    """Remove Perplexity-style reference markers like [1], [2][3] from a line.
+    Keeps the rest of the text intact and collapses extra spaces.
+    """
+    if not isinstance(text, str):
+        return ""
+    # Remove one or more occurrences of [digits], optionally preceded by spaces
+    cleaned = re.sub(r"(?:\s*\[\d+\])+", "", text)
+    # Remove stray spaces before punctuation like .,;:)
+    cleaned = re.sub(r"\s+([,.;:)])", r"\1", cleaned)
+    # Collapse multiple spaces
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+    return cleaned
+
+def normalize_tree_bold_markdown(text: Optional[str]) -> str:
+    """Normalize Perplexity tree suggestion so only the common name is bold.
+    Converts patterns like '**Jamun (Syzygium cumini)** — rationale' to
+    '**Jamun** (Syzygium cumini) — rationale'. If already correct, returns as-is.
+    """
+    if not isinstance(text, str):
+        return ""
+    line = text.strip()
+    # Regex: optional leading numbering, then **Name (Latin)**, then the rest
+    m = re.match(r"^(?:\d+[\.)]\s*)?\*\*([^*()]+?)\s*\(([^)]+)\)\*\*(.*)$", line)
+    if m:
+        name = m.group(1).strip()
+        latin = m.group(2).strip()
+        tail = m.group(3)
+        return f"**{name}** ({latin}){tail}"
+    return line
+
 def render_markdown_html(text: Optional[str]) -> Optional[str]:
     if not text:
         return None

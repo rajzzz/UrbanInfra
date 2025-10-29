@@ -24,7 +24,7 @@ def call_gemini_for_greenery(image_part: Optional[Dict[str, str]], metadata: Dic
         to infer greenery conditions. Estimate a greenery score between 0 and 10, summarize 
         likely vegetation, and relate it to the population density. Respond ONLY with valid JSON in this structure:
         {
-          \"greenery_score\": <integer 0-10>,
+          \"greenery_score\": <integer 0-100>,
           \"greenery_summary\": <string>,
           \"population_context\": <string>,
           \"observations\": [<string>, ...]
@@ -49,8 +49,13 @@ def suggest_trees_via_perplexity(metadata: Dict[str, Any], api_key: str) -> List
     }
     prompt = (
         "You are a Delhi-based urban forestry expert. Based on this ward metadata: "
-        f"{json.dumps(metadata)}, list 5 native Delhi tree species with a short rationale "
-        "for each (max 20 words). Present the answer as a simple numbered list."
+        f"{json.dumps(metadata)}, list 5 native Delhi tree species with a short rationale for each. "
+        "Output requirements (follow exactly):\n"
+        "- Return EXACTLY 5 items as a numbered list from 1 to 5.\n"
+    "- Each item MUST be a single line in the form: 1. **Tree Name** (Latin name) — rationale (12–20 words).\n"
+    "- Bold ONLY the common tree name; the Latin name MUST NOT be bold; do not bold the rationale.\n"
+        "- Do NOT include any citations or reference markers like [1], [2], [a], etc.\n"
+        "- No headings, no extra paragraphs, no code fences, no trailing commentary."
     )
     payload = {
         "model": "sonar-pro",
@@ -85,6 +90,8 @@ def generate_construction_recommendations(metadata: Dict[str, Any], greenery: Di
         "2. Why it satisfies SDG 11 principles (e.g., sustainable transport, inclusive access).\n"
         "3. How it complies with relevant DDA guidance (setbacks, green buffers, density).\n"
         "Close with one actionable next step for city planners. Limit the answer to 200 words."
+        "The points must each be in separate paragraph format not being bundled together for better understanding and readability."
+        "Give heading for each point like *SDG11 requirements:* and *DDA Rules Compliance* that should be in bold like Actionable Next Steps."
     )
 
     model = genai.GenerativeModel(model_name="gemini-2.5-pro")

@@ -1,78 +1,276 @@
-{% extends "layout.html" %} {% block content %}
-<header>
-  <h1>Ward Insights</h1>
-  <p class="lead">Greenery, population context, and nature-based suggestions for this ward. Review the findings and tell us what kind of construction youd like to plan next.</p>
-</header>
-<section class="metrics">
-  <div class="card">
-    <h2>Satellite Snapshot</h2>
-    {% if image_url %}
-    <img src="{{ image_url }}" alt="Satellite view of ward" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08)" />
-    {% elif image_error %}
-    <p style="margin: 0">{{ image_error }}</p>
-    {% else %}
-    <p style="margin: 0">Satellite snapshot unavailable for this ward.</p>
-    {% endif %}
-  </div>
-  <div class="card">
-    <h2>Greenery Score</h2>
-    <p style="font-size: 2.4rem; font-weight: 700; color: #0a6f4f">{{ greenery.greenery_score if greenery else 'N/A' }}</p>
-    <p>{{ greenery.greenery_summary }}</p>
-  </div>
-  <div class="card">
-    <h2>Population Context</h2>
-    <p>{{ greenery.population_context }}</p>
-  </div>
-  <div class="card">
-    <h2>AI Observations</h2>
-    <ul>
-      {% for note in greenery.observations %}
-      <li>{{ note }}</li>
-      {% else %}
-      <li>No observations returned.</li>
-      {% endfor %}
-    </ul>
-  </div>
-  <div class="card">
-    <h2>Tree Planting Ideas</h2>
-    <ul class="trees-list">
-      {% for tree in tree_suggestions %}
-      <li>{{ tree }}</li>
-      {% else %}
-      <li>No tree suggestions available.</li>
-      {% endfor %}
-    </ul>
-  </div>
-</section>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ward Insights - Delhi Urban Analysis</title>
+    <link rel="stylesheet" href="{{ url_for('main.serve_css', path='style.css') }}?v=1.3" type="text/css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-css-reset@1.4.0/dist/reset.min.css" />
+    <style>
+      body {
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        background: #f4f6f8;
+        color: #0b1f33;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+      }
+      .content-pane {
+        flex: 1 1 auto;
+        position: relative;
+        min-width: 0;
+        overflow-y: auto;
+        background: #f4f6f8;
+      }
+      .content-inner {
+        width: min(960px, 100%);
+        margin: 64px auto;
+        padding: 0 16px;
+        background: #ffffff;
+        border-radius: 18px;
+        box-shadow: 0 22px 45px -24px rgba(15, 37, 61, 0.3);
+        padding: 32px clamp(24px, 4vw, 48px);
+      }
+      header {
+        margin-bottom: 28px;
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(1.8rem, 2.2vw, 2.4rem);
+        color: #0c3d64;
+      }
+      p.lead {
+        margin-top: 12px;
+        color: #4c5d6c;
+        line-height: 1.5;
+      }
+      form {
+        display: grid;
+        gap: 18px;
+      }
+      label {
+        font-weight: 600;
+        color: #15324c;
+      }
+      textarea,
+      input,
+      select {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid #d1d9e0;
+        background: #faffff;
+        font-size: 0.95rem;
+      }
+      input[type="file"] {
+        padding: 12px 0;
+        border: none;
+        background: transparent;
+      }
+      button {
+        justify-self: start;
+        background: linear-gradient(135deg, #166086, #1983a1);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 12px 26px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 24px -18px rgba(16, 73, 112, 0.8);
+      }
+      .metrics {
+        display: grid;
+        gap: 16px;
+      }
+      .card {
+        padding: 18px 22px;
+        border-radius: 16px;
+        border: 1px solid rgba(18, 56, 90, 0.08);
+        background: linear-gradient(135deg, rgba(19, 85, 130, 0.05), #ffffff);
+      }
+      .card h2 {
+        font-size: 1.1rem;
+        margin-bottom: 10px;
+        color: #124362;
+      }
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+      }
+      .meta-item {
+        padding: 14px;
+        border-radius: 14px;
+        background: rgba(16, 98, 123, 0.07);
+      }
+      .flash {
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: rgba(204, 48, 58, 0.12);
+        color: #9f1d2a;
+        margin-bottom: 18px;
+      }
+      ul {
+        padding-left: 20px;
+      }
+      .trees-list li {
+        margin-bottom: 8px;
+      }
+      footer {
+        margin-top: 36px;
+        font-size: 0.85rem;
+        color: #688195;
+        text-align: center;
+      }
+      .back-link {
+        display: inline-block;
+        margin-top: 24px;
+        color: #166086;
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .back-link:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-root">
+      <aside class="side-panel" id="side-panel">
+        <div class="side-top">
+          <div id="title-card">
+            <h1>Delhi Administrative Boundaries</h1>
+            <p>An interactive map of districts and wards</p>
+          </div>
 
-<section class="card" style="margin-top: 24px">
-  <h2>Ward Metadata</h2>
-  <div class="meta-grid">
-    {% for key, value in metadata.items() if key not in ['coordinates', 'map_view', 'ward_geojson'] %}
-    <div class="meta-item">
-      <strong>{{ key|replace('_', ' ')|title }}</strong>
-      <div style="margin-top: 6px">{{ value }}</div>
+          <div class="search-box">
+            <label for="ward-search" class="visually-hidden">Search ward</label>
+            <input id="ward-search" type="search" placeholder="Search ward or ward number..." autocomplete="off" />
+            <div id="search-suggestions" class="suggestions" aria-hidden="true"></div>
+          </div>
+
+          <div id="map-controls">
+            <span class="control-label">Satellite View</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="map-type-toggle" />
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="side-bottom info-panel" id="side-info">
+          <div class="info-panel">
+            <h4>Navigation</h4>
+            <p class="muted">View ward insights and analysis results</p>
+            <a href="http://127.0.0.1:5001/" class="analyze-btn" style="text-decoration: none; display: block; text-align: center;">Back to Map</a>
+          </div>
+        </div>
+      </aside>
+
+      <main class="content-pane">
+        <div class="content-inner">
+          {% if get_flashed_messages(with_categories=true) %} 
+            {% for category, message in get_flashed_messages(with_categories=true) %}
+            <div class="flash">{{ message }}</div>
+            {% endfor %} 
+          {% endif %} 
+          
+          <header>
+            <h1>Ward Insights</h1>
+            <p class="lead">Greenery, population context, and nature-based suggestions for this ward. Review the findings and tell us what kind of construction you'd like to plan next.</p>
+          </header>
+          
+          <section class="metrics">
+            <div class="card">
+              <h2>Satellite Snapshot</h2>
+              {% if image_url %}
+              <img src="{{ image_url }}" alt="Satellite view of ward" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08)" />
+              {% elif image_error %}
+              <p style="margin: 0">{{ image_error }}</p>
+              {% else %}
+              <p style="margin: 0">Satellite snapshot unavailable for this ward.</p>
+              {% endif %}
+            </div>
+            <div class="card">
+              <h2>Greenery Score</h2>
+              <p style="font-size: 2.4rem; font-weight: 700; color: #0a6f4f">{{ greenery.greenery_score if greenery else 'N/A' }}</p>
+              <p>{{ greenery.greenery_summary }}</p>
+            </div>
+            <div class="card">
+              <h2>Population Context</h2>
+              <p>{{ greenery.population_context }}</p>
+            </div>
+            <div class="card">
+              <h2>AI Observations</h2>
+              <ul>
+                {% for note in greenery.observations %}
+                <li>{{ note }}</li>
+                {% else %}
+                <li>No observations returned.</li>
+                {% endfor %}
+              </ul>
+            </div>
+            <div class="card">
+              <h2>Tree Planting Ideas</h2>
+              <ul class="trees-list">
+                {% if tree_suggestions_html %}
+                  {% for tree_html in tree_suggestions_html %}
+                    <li>{{ tree_html|safe }}</li>
+                  {% else %}
+                    <li>No tree suggestions available.</li>
+                  {% endfor %}
+                {% else %}
+                  {% for tree in tree_suggestions %}
+                    <li>{{ tree }}</li>
+                  {% else %}
+                    <li>No tree suggestions available.</li>
+                  {% endfor %}
+                {% endif %}
+              </ul>
+            </div>
+          </section>
+
+          <section class="card" style="margin-top: 24px">
+            <h2>Ward Metadata</h2>
+            <div class="meta-grid">
+              {% for key, value in metadata.items() if key not in ['coordinates', 'map_view', 'ward_geojson'] %}
+              <div class="meta-item">
+                <strong>{{ key|replace('_', ' ')|title }}</strong>
+                <div style="margin-top: 6px">{{ value }}</div>
+              </div>
+              {% else %}
+              <p>No metadata provided.</p>
+              {% endfor %}
+            </div>
+          </section>
+
+          <form action="{{ url_for('main.recommend') }}" method="post" class="card" style="margin-top: 28px">
+            <h2>Need a construction plan?</h2>
+            <p style="color: #3f5665; line-height: 1.5">Tell us what you're planning to build. We'll combine the greenery insights, SDG 11 targets, and DDA rules to suggest micro-locations and next steps.</p>
+            <label for="construction_type">Construction type</label>
+            <input id="construction_type" type="text" name="construction_type" placeholder="e.g., community clinic, senior housing, riverfront park" required value="{{ construction_type or '' }}" />
+            <button type="submit">Generate recommendations</button>
+          </form>
+
+          {% if recommendations_html %}
+          <section class="card" style="margin-top: 28px">
+            <h2>AI Construction Guidance</h2>
+            <div class="markdown-body">{{ recommendations_html|safe }}</div>
+          </section>
+          {% endif %}
+
+          <a href="http://127.0.0.1:5001/" class="back-link">⬅ Back to Map</a>
+          
+          <footer>Built for Delhi ward-level sustainable planning.</footer>
+        </div>
+      </main>
     </div>
-    {% else %}
-    <p>No metadata provided.</p>
-    {% endfor %}
-  </div>
-</section>
-
-<form action="{{ url_for('main.recommend') }}" method="post" class="card" style="margin-top: 28px">
-  <h2>Need a construction plan?</h2>
-  <p style="color: #3f5665; line-height: 1.5">Tell us what youre planning to build. Well combine the greenery insights, SDG 11 targets, and DDA rules to suggest micro-locations and next steps.</p>
-  <label for="construction_type">Construction type</label>
-  <input id="construction_type" type="text" name="construction_type" placeholder="e.g., community clinic, senior housing, riverfront park" required value="{{ construction_type or '' }}" />
-  <button type="submit">Generate recommendations</button>
-</form>
-
-{% if recommendations_html %}
-<section class="card" style="margin-top: 28px">
-  <h2>AI Construction Guidance</h2>
-  <div class="markdown-body">{{ recommendations_html|safe }}</div>
-</section>
-{% endif %}
-
-<a href="http://127.0.0.1:5001" style="display: inline-block; margin-top: 24px"> ⬅back to new analysis </a>
-{% endblock %}
+  </body>
+</html>

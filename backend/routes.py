@@ -9,7 +9,12 @@ main_bp = Blueprint('main', __name__)
 
 @main_bp.route("/", methods=["GET"])
 def home():
-    return send_file("../index.html")
+    response = send_file("../index.html")
+    # Ensure no caching for the main page
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @main_bp.route("/analyze", methods=["POST"])
 def analyze():
@@ -124,11 +129,15 @@ def analyze():
             return {"redirect_url": url_for("main.latest_analysis")}
 
         image_url = url_for("main.analysis_image", token=image_token) if image_token else None
+        trees_sanitized = [utils.strip_reference_citations(t) for t in trees]
+        trees_normalized = [utils.normalize_tree_bold_markdown(t) for t in trees_sanitized]
+        trees_html = [utils.render_markdown_html(t) for t in trees_normalized]
         return render_template(
             "results.html",
             metadata=metadata_for_session,
             greenery=greenery,
-            tree_suggestions=trees,
+            tree_suggestions=trees_normalized,
+            tree_suggestions_html=trees_html,
             recommendations=None,
             recommendations_html=None,
             construction_type=None,
@@ -154,6 +163,7 @@ def latest_analysis():
         metadata=analysis["metadata"],
         greenery=analysis["greenery"],
         tree_suggestions=analysis["trees"],
+        tree_suggestions_html=[utils.render_markdown_html(utils.normalize_tree_bold_markdown(utils.strip_reference_citations(t))) for t in (analysis.get("trees") or [])],
         recommendations=analysis.get("recommendations"),
         recommendations_html=analysis.get("recommendations_html") or utils.render_markdown_html(analysis.get("recommendations")),
         construction_type=analysis.get("construction_type"),
@@ -226,11 +236,21 @@ def upload_page():
 
 @main_bp.route("/js/<path:path>")
 def serve_js(path):
-    return send_from_directory("../js", path)
+    response = send_from_directory("../js", path)
+    # Prevent caching of JavaScript files
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @main_bp.route("/css/<path:path>")
 def serve_css(path):
-    return send_from_directory("../css", path)
+    response = send_from_directory("../css", path)
+    # Prevent caching of CSS files
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @main_bp.route("/data/<path:path>")
 def serve_data(path):

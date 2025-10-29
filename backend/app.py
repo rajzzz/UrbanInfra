@@ -28,6 +28,9 @@ def create_app():
 
     return app
 
+# Create the application instance for WSGI servers
+app = create_app()
+
 if __name__ == "__main__":
-    app = create_app()
+    # Development server
     app.run(debug=True, host="0.0.0.0", port=int(app.config.get("PORT", 5001)))
