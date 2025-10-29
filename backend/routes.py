@@ -266,8 +266,8 @@ def get_maps_sdk_url():
     if not api_key:
         return "API key not configured", 500
     
-    # This is the modern Google Maps SDK URL, compatible with dynamic library import
-    sdk_url = f"https://maps.googleapis.com/maps/api/js?key={api_key}"
+    # This is the modern Google Maps SDK URL with async loading for best performance
+    sdk_url = f"https://maps.googleapis.com/maps/api/js?key={api_key}&loading=async"
     
     return jsonify({
         "sdk_url": sdk_url

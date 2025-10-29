@@ -15,10 +15,10 @@ from flask import current_app, request, flash, redirect, url_for
 def set_security_headers(response):
     csp = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.googleapis.com *.google.com; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.googleapis.com *.google.com *.gstatic.com; "
         "style-src 'self' 'unsafe-inline' *.googleapis.com *.gstatic.com; "
         "font-src 'self' data: *.gstatic.com; "
-        "connect-src 'self' data: https://raw.githubusercontent.com *.googleapis.com *.google.com *.gstatic.com; "
+        "connect-src 'self' data: https://raw.githubusercontent.com *.googleapis.com *.google.com *.gstatic.com maps.gstatic.com; "
         "img-src 'self' data: *.googleapis.com *.gstatic.com; "
         "frame-src *.google.com; "
         "worker-src blob:;"
