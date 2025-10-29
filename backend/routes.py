@@ -243,6 +243,10 @@ def serve_js(path):
     response.headers['Expires'] = '0'
     return response
 
+@main_bp.route("/favicon.ico")
+def favicon():
+    return send_from_directory("..", "favicon.ico", mimetype="image/vnd.microsoft.icon")
+
 @main_bp.route("/css/<path:path>")
 def serve_css(path):
     response = send_from_directory("../css", path)
