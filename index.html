@@ -19,10 +19,30 @@
           script.src = data.sdk_url;
           script.async = true;
           script.defer = true;
-          script.onload = () => {
-            // The initMap function is now globally available, so we can call it.
-            if (window.initMap) {
-              window.initMap();
+          script.onload = async () => {
+            // Wait for Google Maps to be fully loaded before initializing
+            try {
+              // Wait for the maps library to be available
+              while (typeof google === 'undefined' || !google.maps || !google.maps.Map) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+              }
+              
+              // Additional wait to ensure libraries are ready
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+              // The initMap function is now globally available, so we can call it.
+              if (window.initMap) {
+                await window.initMap();
+              } else {
+                console.warn("initMap function not found, retrying...");
+                setTimeout(() => {
+                  if (window.initMap) {
+                    window.initMap();
+                  }
+                }, 500);
+              }
+            } catch (error) {
+              console.error("Error initializing map:", error);
             }
           };
           document.head.appendChild(script);

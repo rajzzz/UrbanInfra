@@ -347,6 +347,20 @@ let wardPopulationMap = {};
 // Initialization
 // =====================================
 async function initMap() {
+  // Ensure Google Maps is fully loaded
+  if (typeof google === 'undefined' || !google.maps || !google.maps.Map) {
+    console.error("Google Maps API not loaded yet");
+    setTimeout(() => initMap(), 200);
+    return;
+  }
+  
+  // Ensure map container exists
+  const mapContainer = document.getElementById("map");
+  if (!mapContainer) {
+    console.error("Map container element not found");
+    return;
+  }
+  
   let AdvancedMarkerElement;
   try {
     const markerLibrary = await google.maps.importLibrary("marker");
@@ -358,6 +372,19 @@ async function initMap() {
   }
 
   map = initializeMap();
+  
+  if (!map) {
+    console.error("Failed to initialize map");
+    return;
+  }
+  
+  // Ensure map is properly sized after initialization
+  setTimeout(() => {
+    if (map && google && google.maps && google.maps.event) {
+      google.maps.event.trigger(map, 'resize');
+    }
+  }, 200);
+  
   infoPanel = createInfoPanel();
   setupBackButton(map, handleBackButtonClick);
   setupMapTypeToggle(map);
@@ -384,6 +411,13 @@ async function initMap() {
     if (currentView === "wards") return getWardStyle();
     return {};
   });
+  
+  // Trigger another resize after data is loaded to ensure proper rendering
+  setTimeout(() => {
+    if (map && google && google.maps && google.maps.event) {
+      google.maps.event.trigger(map, 'resize');
+    }
+  }, 500);
 
   // Hover info
   map.data.addListener("mouseover", (event) => {
