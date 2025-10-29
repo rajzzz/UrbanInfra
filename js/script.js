@@ -331,11 +331,17 @@ let map;
 let districtDataGeoJson;
 let wardDataGeoJson;
 let selectedDistrict = null;
+let selectedDistrictName = null;
 let currentView = "districts";
 let districtLabels = [];
 let wardLabels = [];
 let idleListener = null;
 let tilesListener = null;
+let wardIndex = []; // will hold searchable ward entries
+let suggestionSelected = -1;
+let infoPanel = null;
+// Population lookup table: normalized ward name -> population number
+let wardPopulationMap = {};
 
 // =====================================
 // Initialization
@@ -352,14 +358,21 @@ async function initMap() {
   }
 
   map = initializeMap();
-  const infoPanel = createInfoPanel();
-  map.controls[google.maps.ControlPosition.TOP_LEFT].push(infoPanel.getElement());
+  infoPanel = createInfoPanel();
   setupBackButton(map, handleBackButtonClick);
   setupMapTypeToggle(map);
 
   try {
     districtDataGeoJson = await fetchGeoJSON("https://raw.githubusercontent.com/datta07/INDIAN-SHAPEFILES/master/STATES/DELHI/DELHI_DISTRICTS.geojson");
     wardDataGeoJson = await fetchGeoJSON("https://raw.githubusercontent.com/datameet/Municipal_Spatial_Data/refs/heads/master/Delhi/Delhi_Wards.geojson");
+    // Load CSV with population data (local file included in js/)
+    try {
+      const popCsvText = await fetch('./js/delhi_ward_population.csv').then(r => r.text());
+      parsePopulationCsv(popCsvText);
+    } catch (csvErr) {
+      console.warn('Could not load population CSV:', csvErr?.message || csvErr);
+    }
+    buildWardIndex();
   } catch (error) {
     console.error("Failed to load GeoJSON data:", error);
     alert("Could not load map data.");
@@ -377,7 +390,7 @@ async function initMap() {
     if (currentView === "ward") return;
     map.data.revertStyle();
     map.data.overrideStyle(event.feature, { strokeWeight: 4 });
-    infoPanel.update(event.feature);
+    infoPanel.update(event.feature, selectedDistrictName);
   });
 
   map.data.addListener("mouseout", () => {
@@ -390,11 +403,33 @@ async function initMap() {
   map.data.addListener("click", (event) => {
     if (currentView === "districts") {
       selectedDistrict = event.feature;
+      selectedDistrictName = selectedDistrict ? selectedDistrict.getProperty("dtname") : null;
       showWardsInDistrict(AdvancedMarkerElement);
     } else if (currentView === "wards") {
       showSingleWard(event.feature);
     }
   });
+
+  // Wire up search box
+  setupSearchUI(AdvancedMarkerElement);
+
+  // Provide analyze handler: the UI's Analyze button will call this with a google.maps.Data.Feature
+  if (infoPanel && typeof infoPanel.setAnalyzeHandler === "function") {
+    infoPanel.setAnalyzeHandler((feature) => {
+      // If the feature is a raw GeoJSON object (from wardDataGeoJson), convert it by adding to map.data
+      try {
+        // If it's already a google.maps.Data.Feature, show it directly
+        if (feature && typeof feature.getGeometry === "function") {
+          showSingleWard(feature);
+        } else {
+          const added = map.data.addGeoJson({ type: "FeatureCollection", features: [feature] })[0];
+          if (added) showSingleWard(added);
+        }
+      } catch (err) {
+        console.error("Analyze handler error:", err);
+      }
+    });
+  }
 
   showAllDistricts(AdvancedMarkerElement);
 }
@@ -472,13 +507,8 @@ function showSingleWard(wardFeature) {
 // Capture Ward Screenshot + Metadata
 // =====================================
 async function captureAndProcessWard(wardFeature) {
-  const loader = document.getElementById("loader");
-  let loaderLabel = null;
-  if (loader) {
-    loader.style.display = "block";
-    loaderLabel = loader.querySelector("p");
-    if (loaderLabel) loaderLabel.textContent = "Preparing ward metadata...";
-  }
+  showLoader("Preparing ward metadata...", 10);
+  startLoaderPhases();
 
   try {
     const bounds = new google.maps.LatLngBounds();
@@ -490,7 +520,8 @@ async function captureAndProcessWard(wardFeature) {
     const metadata = {
       wardName: wardFeature.getProperty("Ward_Name"),
       wardNumber: wardFeature.getProperty("Ward_No"),
-      districtName: selectedDistrict ? selectedDistrict.getProperty("dtname") : "N/A",
+      districtName: selectedDistrictName || (selectedDistrict ? selectedDistrict.getProperty("dtname") : "N/A"),
+      population: wardFeature.getProperty("population") !== null && wardFeature.getProperty("population") !== undefined ? wardFeature.getProperty("population") : 'N/A',
       coordinates: {
         bounding_box: {
           southwest: { lat: sw.lat(), lng: sw.lng() },
@@ -515,30 +546,39 @@ async function captureAndProcessWard(wardFeature) {
     let imageFile = null;
     console.log("⏩ Skipping canvas capture - using backend Static Maps API for reliable satellite imagery");
 
-    if (loaderLabel) {
-      loaderLabel.textContent = "Sending ward metadata to AI backend...";
-    }
+    setLoaderProgress(Math.max(loaderProgress, 35), "Sending data to backend...");
 
     const redirectPath = await submitWardForAnalysis(metadata, imageFile);
     const redirectUrl = new URL(redirectPath, BACKEND_BASE_URL).toString();
     console.log("✅ Analysis request accepted. Redirecting to results:", redirectUrl);
 
-    window.location.href = redirectUrl;
+    setLoaderProgress(100, "Done! Redirecting...");
+    setTimeout(() => {
+      window.location.href = redirectUrl;
+    }, 250);
   } catch (err) {
     console.error("Failed to capture or send data:", err?.message || err);
-    alert("Could not process ward. Please check the console.");
-  } finally {
-    if (loader) {
-      const loaderLabel = loader.querySelector("p");
-      if (loaderLabel && loaderLabel.textContent !== "Sending ward to AI backend...") {
-        loaderLabel.textContent = "Upload failed. Please try again.";
+    // Try a non-blocking fallback: request latest analysis page from backend and redirect there if available.
+    (async () => {
+      try {
+        const latestUrl = new URL("/analysis/latest", BACKEND_BASE_URL).toString();
+        setLoaderProgress(Math.max(loaderProgress, 90), "Attempting fallback...");
+        const resp = await fetch(latestUrl, { method: "GET", credentials: "include" });
+        if (resp && resp.ok) {
+          console.warn("Redirecting to latest analysis as fallback after error");
+          setLoaderProgress(100, "Redirecting to last analysis...");
+          setTimeout(() => (window.location.href = latestUrl), 250);
+          return;
+        }
+      } catch (fetchErr) {
+        console.warn("Fallback fetch for latest analysis failed", fetchErr?.message || fetchErr);
       }
-      setTimeout(() => {
-        loader.style.display = "none";
-        const innerLabel = loader.querySelector("p");
-        if (innerLabel) innerLabel.textContent = "Analyzing Ward...";
-      }, 1200);
-    }
+
+      // If fallback didn't work, show a single non-blocking alert as last resort
+      setLoaderProgress(100, "Could not process ward. Please try again.");
+      setTimeout(() => hideLoader(), 1000);
+      alert("Could not process ward. Please check the console.");
+    })();
   }
 }
 
@@ -615,20 +655,36 @@ async function submitWardForAnalysis(metadata, imageFile) {
   } catch (networkError) {
     throw new Error("Unable to reach backend at " + BACKEND_BASE_URL + ": " + networkError.message);
   }
+  // Try to parse JSON body (may fail)
+  let payload = null;
+  try {
+    payload = await response
+      .clone()
+      .json()
+      .catch(() => null);
+  } catch (e) {
+    payload = null;
+  }
 
   if (!response.ok) {
-    console.error("Backend returned error", response.status, await response.clone().text());
-    const message = await response.text().catch(() => response.statusText);
-    throw new Error("Backend error " + response.status + ": " + message);
+    if (payload && payload.redirect_url) {
+      console.warn("Backend returned non-OK but included redirect_url; continuing with redirect.");
+      return payload.redirect_url;
+    }
+    const text = await response
+      .clone()
+      .text()
+      .catch(() => response.statusText);
+    console.error("Backend error", response.status, text);
+    throw new Error("Backend error " + response.status + ": " + (text || response.statusText));
   }
 
-  console.log("Ward submission succeeded", response.status, response.headers.get("Set-Cookie"));
-  const payload = await response.json();
-  if (!payload.redirect_url) {
+  const result = payload || (await response.json().catch(() => null));
+  if (!result || !result.redirect_url) {
     throw new Error("Backend response missing redirect_url.");
   }
-
-  return payload.redirect_url;
+  console.log("Ward submission succeeded", response.status, response.headers.get("Set-Cookie"));
+  return result.redirect_url;
 }
 
 function featureToGeoJson(feature) {
@@ -800,6 +856,79 @@ function updateTitleCardVisibility() {
   if (titleCard) titleCard.style.display = currentView === "ward" ? "none" : "block";
 }
 
+// -----------------------------
+// Loader helpers (center overlay with progress bar)
+// -----------------------------
+let loaderTimer = null;
+let loaderAnimating = false;
+let loaderProgress = 0;
+
+const loaderPhases = [
+  { from: 5, to: 20, duration: 800, text: "Preparing ward metadata..." },
+  { from: 20, to: 55, duration: 2000, text: "Sending data to backend..." },
+  { from: 55, to: 85, duration: 2500, text: "Analyzing satellite image..." },
+  { from: 85, to: 98, duration: 2200, text: "Generating recommendations..." },
+];
+
+function showLoader(statusText = "Preparing ward metadata...", percent = 5) {
+  const overlay = document.getElementById("loader");
+  if (!overlay) return;
+  overlay.classList.add("is-visible");
+  overlay.setAttribute("aria-hidden", "false");
+  setLoaderProgress(percent, statusText);
+}
+
+function hideLoader() {
+  const overlay = document.getElementById("loader");
+  if (!overlay) return;
+  overlay.classList.remove("is-visible");
+  overlay.setAttribute("aria-hidden", "true");
+  stopLoaderPhases();
+  // reset bar for next time
+  const bar = document.getElementById("loader-progress");
+  if (bar) bar.style.width = "0%";
+}
+
+function setLoaderProgress(percent, statusText) {
+  loaderProgress = Math.max(0, Math.min(100, percent));
+  const bar = document.getElementById("loader-progress");
+  const status = document.getElementById("loader-status");
+  if (bar) bar.style.width = loaderProgress + "%";
+  if (status && statusText) status.textContent = statusText;
+}
+
+function startLoaderPhases() {
+  stopLoaderPhases();
+  let phaseIndex = 0;
+  loaderAnimating = true;
+  const runPhase = () => {
+    if (!loaderAnimating || phaseIndex >= loaderPhases.length) return;
+    const { from, to, duration, text } = loaderPhases[phaseIndex];
+    const start = performance.now();
+    const animate = (t) => {
+      if (!loaderAnimating) return;
+      const elapsed = t - start;
+      const ratio = Math.max(0, Math.min(1, elapsed / duration));
+      const value = Math.round(from + (to - from) * ratio);
+      setLoaderProgress(value, text);
+      if (ratio < 1) {
+        loaderTimer = requestAnimationFrame(animate);
+      } else {
+        phaseIndex += 1;
+        runPhase();
+      }
+    };
+    loaderTimer = requestAnimationFrame(animate);
+  };
+  runPhase();
+}
+
+function stopLoaderPhases() {
+  loaderAnimating = false;
+  if (loaderTimer) cancelAnimationFrame(loaderTimer);
+  loaderTimer = null;
+}
+
 function showAllDistricts(AdvancedMarkerElement) {
   clearMapData();
   clearLabels(wardLabels);
@@ -816,6 +945,240 @@ function showAllDistricts(AdvancedMarkerElement) {
   selectedDistrict = null;
   document.getElementById("back-button").style.display = "none";
   updateTitleCardVisibility();
+}
+
+// -----------------------------
+// Search / Suggestion Helpers
+// -----------------------------
+// Normalize names for comparison: trim, collapse whitespace, uppercase
+function normalizeName(s) {
+  if (!s) return "";
+  return s.toString().trim().replace(/\s+/g, " ").toUpperCase();
+}
+
+// Canonicalize ward names specifically for population matching between GeoJSON and CSV.
+// The goal is to standardize obvious spelling/format variants without fuzzy matching.
+// Rules:
+// - Uppercase
+// - Replace & with AND
+// - Remove punctuation (.,'’()-) and hyphens
+// - Normalize common tokens: EXTN/EXT./EXTENTION -> EXTENSION, I.P -> IP
+// - Normalize a couple of known Delhi variants (e.g., JAHAGIR -> JAHANGIR, BHALASWA -> BHALSWA)
+// - Normalize PHASE roman numerals (I/II) to 1/2
+// - Collapse whitespace; optionally remove spaces entirely when noSpaces=true
+function normalizeWardKey(input, noSpaces = false) {
+  if (!input) return "";
+  let s = input.toString().toUpperCase();
+
+  // Token fixes before stripping punctuation
+  s = s.replace(/&/g, " AND ");
+
+  // Strip punctuation, keep spaces for token boundaries
+  s = s.replace(/[\.,'’()]/g, " ");
+  s = s.replace(/-/g, " ");
+
+  // Common expansions / corrections
+  s = s.replace(/\bEXTN\b/g, " EXTENSION ");
+  s = s.replace(/\bEXT\.?\b/g, " EXTENSION ");
+  s = s.replace(/\bEXTENTION\b/g, " EXTENSION ");
+  s = s.replace(/\bI\s*\.?\s*P\b/g, " IP "); // I.P -> IP
+
+  // Known variants seen in datasets
+  s = s.replace(/\bJAHAGIR\b/g, " JAHANGIR ");
+  s = s.replace(/\bBHALASWA\b/g, " BHALSWA ");
+
+  // PHASE roman numerals to digits
+  s = s.replace(/\bPHASE\s*-?\s*I\b/g, " PHASE 1");
+  s = s.replace(/\bPHASE\s*-?\s*II\b/g, " PHASE 2");
+
+  // Collapse whitespace
+  s = s.replace(/\s+/g, " ").trim();
+
+  if (noSpaces) s = s.replace(/\s+/g, "");
+  return s;
+}
+
+function buildWardIndex() {
+  if (!wardDataGeoJson || !wardDataGeoJson.features) return;
+  // Merge population into ward feature properties where possible
+  wardDataGeoJson.features.forEach((f) => {
+    try {
+      const name = f.properties.Ward_Name || f.properties.WardName || f.properties.ward_name || '';
+      const pop = getPopulationForWard(name);
+      f.properties.population = pop !== null ? pop : null;
+    } catch (e) {
+      // ignore
+    }
+  });
+
+  wardIndex = wardDataGeoJson.features.map((f, i) => {
+    const name = (f.properties.Ward_Name || "").toString();
+    const number = f.properties.Ward_No ? f.properties.Ward_No.toString() : "";
+    return {
+      nameUpper: name.toUpperCase(),
+      name: name,
+      number: number,
+      featureIndex: i,
+    };
+  });
+}
+
+// Parse CSV text of population file into wardPopulationMap (normalized keys)
+function parsePopulationCsv(csvText) {
+  const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length <= 1) return;
+  const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const wardIdx = header.indexOf('ward');
+  const popIdx = header.indexOf('total_population') >= 0 ? header.indexOf('total_population') : header.indexOf('population') || 1;
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',').map(c => c.trim());
+    const wardName = cols[wardIdx] || cols[0];
+    const pop = cols[popIdx] ? Number(cols[popIdx].replace(/\D/g, '')) : null;
+    if (wardName) {
+      const pVal = isNaN(pop) ? null : pop;
+      // Store both spaced and no-space canonical keys for resilient matching
+      const keySpaced = normalizeWardKey(wardName, false);
+      const keyTight = normalizeWardKey(wardName, true);
+      wardPopulationMap[keySpaced] = pVal;
+      wardPopulationMap[keyTight] = pVal;
+    }
+  }
+}
+
+function getPopulationForWard(wardName) {
+  if (!wardName) return null;
+  // Try spaced canonical key
+  const keySpaced = normalizeWardKey(wardName, false);
+  let p = wardPopulationMap[keySpaced];
+  if (typeof p === 'number') return p;
+  // Try compact (no-space) canonical key
+  const keyTight = normalizeWardKey(wardName, true);
+  p = wardPopulationMap[keyTight];
+  return typeof p === 'number' ? p : null;
+}
+
+function setupSearchUI(AdvancedMarkerElement) {
+  const input = document.getElementById("ward-search");
+  const suggestions = document.getElementById("search-suggestions");
+  if (!input || !suggestions) return;
+
+  input.addEventListener("input", (e) => {
+    const q = (e.target.value || "").trim().toUpperCase();
+    renderSuggestions(q);
+  });
+
+  input.addEventListener("keydown", (e) => {
+    const items = suggestions.querySelectorAll(".suggestion-item");
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      suggestionSelected = Math.min(suggestionSelected + 1, items.length - 1);
+      updateSuggestionHighlight(items);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      suggestionSelected = Math.max(suggestionSelected - 1, 0);
+      updateSuggestionHighlight(items);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (suggestionSelected >= 0 && items[suggestionSelected]) {
+        items[suggestionSelected].click();
+      } else if (items.length === 1) {
+        items[0].click();
+      }
+    }
+  });
+
+  // click outside to close
+  document.addEventListener("click", (ev) => {
+    if (!ev.composedPath().includes(input) && !ev.composedPath().includes(suggestions)) {
+      suggestions.innerHTML = "";
+      suggestions.setAttribute("aria-hidden", "true");
+      suggestionSelected = -1;
+    }
+  });
+
+  function renderSuggestions(query) {
+    suggestions.innerHTML = "";
+    suggestionSelected = -1;
+    if (!query) {
+      suggestions.setAttribute("aria-hidden", "true");
+      return;
+    }
+
+    const matches = wardIndex.filter((w) => w.nameUpper.includes(query) || w.number === query).slice(0, 30);
+    if (matches.length === 0) {
+      suggestions.setAttribute("aria-hidden", "true");
+      return;
+    }
+
+    suggestions.setAttribute("aria-hidden", "false");
+    const fragment = document.createDocumentFragment();
+    matches.forEach((m) => {
+      const div = document.createElement("div");
+      div.className = "suggestion-item";
+      div.textContent = m.name + (m.number ? ` (${m.number})` : "");
+      div.dataset.index = m.featureIndex;
+      div.addEventListener("click", async () => {
+        const idx = Number(div.dataset.index);
+        const feature = wardDataGeoJson.features[idx];
+        if (!feature) return;
+
+        // Clear current map data and add the selected ward feature to the map for preview
+        clearMapData();
+        const addedFeature = map.data.addGeoJson({ type: "FeatureCollection", features: [feature] })[0];
+        map.data.overrideStyle(addedFeature, getSelectedWardStyle ? getSelectedWardStyle() : {});
+
+        // Fit map to ward bounds
+        try {
+          const bounds = new google.maps.LatLngBounds();
+          addedFeature.getGeometry().forEachLatLng((latlng) => bounds.extend(latlng));
+          map.fitBounds(bounds);
+        } catch (err) {
+          console.warn("Could not fit bounds for selected ward", err);
+        }
+
+        // Do NOT auto-run analysis — let user click the Analyze button in the side panel
+        // try to infer district by searching districtWardMap for ward name
+        // Infer district robustly by normalizing ward names (trim + uppercase)
+        try {
+          const wardNameRaw = addedFeature.getProperty && addedFeature.getProperty("Ward_Name");
+          selectedDistrictName = null;
+          if (wardNameRaw) {
+            const wardNameNorm = normalizeName(wardNameRaw);
+            for (const [dName, wards] of Object.entries(districtWardMap)) {
+              for (const w of wards) {
+                if (normalizeName(w) === wardNameNorm) {
+                  selectedDistrictName = dName;
+                  break;
+                }
+              }
+              if (selectedDistrictName) break;
+            }
+          }
+        } catch (e) {
+          selectedDistrictName = null;
+        }
+
+        // Update UI panels (left side info) — pass the inferred district name
+        if (infoPanel && typeof infoPanel.update === "function") infoPanel.update(addedFeature, selectedDistrictName);
+
+        suggestions.innerHTML = "";
+        suggestions.setAttribute("aria-hidden", "true");
+        input.value = "";
+      });
+      fragment.appendChild(div);
+    });
+    suggestions.appendChild(fragment);
+  }
+
+  function updateSuggestionHighlight(items) {
+    items.forEach((it, i) => {
+      if (i === suggestionSelected) it.classList.add("active");
+      else it.classList.remove("active");
+    });
+    if (suggestionSelected >= 0 && items[suggestionSelected]) {
+      items[suggestionSelected].scrollIntoView({ block: "nearest" });
+    }
+  }
 }
 
 function showWardsInDistrict(AdvancedMarkerElement) {
@@ -863,5 +1226,3 @@ function handleBackButtonClick() {
     })
     .catch((err) => console.error("Error restoring markers:", err));
 }
-
-
