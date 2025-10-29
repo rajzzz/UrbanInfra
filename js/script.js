@@ -361,14 +361,28 @@ async function initMap() {
     return;
   }
   
+  // Wait for importLibrary to be available (required for async loading)
+  let retries = 0;
+  const maxRetries = 20; // 10 seconds max wait time (20 * 500ms)
+  while (!google.maps.importLibrary && retries < maxRetries) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    retries++;
+  }
+  
+  if (!google.maps.importLibrary) {
+    console.error("google.maps.importLibrary is not available after waiting");
+    alert("Could not load Google Maps marker library. Please refresh the page.");
+    return;
+  }
+  
   let AdvancedMarkerElement;
   try {
     const markerLibrary = await google.maps.importLibrary("marker");
     AdvancedMarkerElement = markerLibrary.AdvancedMarkerElement;
   } catch (error) {
     console.error("Error importing Google Maps marker library:", error);
-    alert("Could not load map markers.");
-    return;
+    // Don't return, continue without AdvancedMarkerElement - use fallback if needed
+    console.warn("Continuing without AdvancedMarkerElement - some features may be limited");
   }
 
   map = initializeMap();
@@ -438,14 +452,39 @@ async function initMap() {
     if (currentView === "districts") {
       selectedDistrict = event.feature;
       selectedDistrictName = selectedDistrict ? selectedDistrict.getProperty("dtname") : null;
-      showWardsInDistrict(AdvancedMarkerElement);
+      if (AdvancedMarkerElement) {
+        showWardsInDistrict(AdvancedMarkerElement);
+      } else {
+        // Fallback: try to load the marker library again
+        google.maps.importLibrary("marker")
+          .then(({ AdvancedMarkerElement }) => {
+            showWardsInDistrict(AdvancedMarkerElement);
+          })
+          .catch((err) => {
+            console.error("Error loading markers:", err);
+            // Continue without markers
+            showWardsInDistrict(null);
+          });
+      }
     } else if (currentView === "wards") {
       showSingleWard(event.feature);
     }
   });
 
   // Wire up search box
-  setupSearchUI(AdvancedMarkerElement);
+  if (AdvancedMarkerElement) {
+    setupSearchUI(AdvancedMarkerElement);
+  } else {
+    // Try to load marker library for search
+    google.maps.importLibrary("marker")
+      .then(({ AdvancedMarkerElement }) => {
+        setupSearchUI(AdvancedMarkerElement);
+      })
+      .catch((err) => {
+        console.error("Error loading markers for search:", err);
+        setupSearchUI(null);
+      });
+  }
 
   // Provide analyze handler: the UI's Analyze button will call this with a google.maps.Data.Feature
   if (infoPanel && typeof infoPanel.setAnalyzeHandler === "function") {
@@ -909,19 +948,30 @@ function clearLabels(labelArray) {
 }
 
 function createLabelForFeature(feature, text, AdvancedMarkerElement) {
+  // Skip label creation if AdvancedMarkerElement is not available
+  if (!AdvancedMarkerElement) {
+    console.warn("AdvancedMarkerElement not available, skipping label creation");
+    return null;
+  }
+  
   const bounds = new google.maps.LatLngBounds();
   feature.getGeometry().forEachLatLng((latlng) => bounds.extend(latlng));
   const div = document.createElement("div");
   div.className = "map-label";
   div.textContent = text;
 
-  const marker = new AdvancedMarkerElement({
-    position: bounds.getCenter(),
-    map: map,
-    content: div,
-    title: text,
-  });
-  return marker;
+  try {
+    const marker = new AdvancedMarkerElement({
+      position: bounds.getCenter(),
+      map: map,
+      content: div,
+      title: text,
+    });
+    return marker;
+  } catch (error) {
+    console.error("Error creating marker:", error);
+    return null;
+  }
 }
 
 function updateTitleCardVisibility() {
@@ -1010,7 +1060,10 @@ function showAllDistricts(AdvancedMarkerElement) {
   const features = map.data.addGeoJson(districtDataGeoJson);
   features.forEach((f) => {
     const name = f.getProperty("dtname");
-    if (name) districtLabels.push(createLabelForFeature(f, name, AdvancedMarkerElement));
+    if (name) {
+      const label = createLabelForFeature(f, name, AdvancedMarkerElement);
+      if (label) districtLabels.push(label);
+    }
   });
 
   map.setCenter({ lat: 28.6139, lng: 77.209 });
@@ -1272,7 +1325,10 @@ function showWardsInDistrict(AdvancedMarkerElement) {
   const features = map.data.addGeoJson(wardFeatures);
   features.forEach((f) => {
     const name = f.getProperty("Ward_Name");
-    if (name) wardLabels.push(createLabelForFeature(f, name, AdvancedMarkerElement));
+    if (name) {
+      const label = createLabelForFeature(f, name, AdvancedMarkerElement);
+      if (label) wardLabels.push(label);
+    }
   });
 
   const bounds = new google.maps.LatLngBounds();
@@ -1291,11 +1347,23 @@ function handleBackButtonClick() {
   const toggleCheckbox = document.getElementById("map-type-toggle");
   if (toggleCheckbox) toggleCheckbox.checked = false;
 
-  google.maps
-    .importLibrary("marker")
-    .then(({ AdvancedMarkerElement }) => {
-      if (currentView === "ward") showWardsInDistrict(AdvancedMarkerElement);
-      else if (currentView === "wards") showAllDistricts(AdvancedMarkerElement);
-    })
-    .catch((err) => console.error("Error restoring markers:", err));
+  // Check if importLibrary is available before using it
+  if (google.maps && typeof google.maps.importLibrary === 'function') {
+    google.maps
+      .importLibrary("marker")
+      .then(({ AdvancedMarkerElement }) => {
+        if (currentView === "ward") showWardsInDistrict(AdvancedMarkerElement);
+        else if (currentView === "wards") showAllDistricts(AdvancedMarkerElement);
+      })
+      .catch((err) => {
+        console.error("Error restoring markers:", err);
+        // Continue without markers if library loading fails
+        if (currentView === "ward") showWardsInDistrict(null);
+        else if (currentView === "wards") showAllDistricts(null);
+      });
+  } else {
+    console.warn("google.maps.importLibrary not available, continuing without markers");
+    if (currentView === "ward") showWardsInDistrict(null);
+    else if (currentView === "wards") showAllDistricts(null);
+  }
 }

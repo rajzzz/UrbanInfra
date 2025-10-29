@@ -23,12 +23,23 @@
             // Wait for Google Maps to be fully loaded before initializing
             try {
               // Wait for the maps library to be available
-              while (typeof google === 'undefined' || !google.maps || !google.maps.Map) {
+              let retries = 0;
+              const maxRetries = 50; // 2.5 seconds max wait (50 * 50ms)
+              while ((typeof google === 'undefined' || !google.maps || !google.maps.Map) && retries < maxRetries) {
                 await new Promise(resolve => setTimeout(resolve, 50));
+                retries++;
               }
               
-              // Additional wait to ensure libraries are ready
-              await new Promise(resolve => setTimeout(resolve, 100));
+              if (typeof google === 'undefined' || !google.maps || !google.maps.Map) {
+                throw new Error("Google Maps API failed to load");
+              }
+              
+              // Additional wait to ensure importLibrary is also available
+              retries = 0;
+              while (!google.maps.importLibrary && retries < 20) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                retries++;
+              }
               
               // The initMap function is now globally available, so we can call it.
               if (window.initMap) {
@@ -43,6 +54,19 @@
               }
             } catch (error) {
               console.error("Error initializing map:", error);
+              // Show user-friendly error message
+              const mapContainer = document.getElementById("map");
+              if (mapContainer) {
+                mapContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: white; font-family: Inter, sans-serif;"><div><h2>Map Loading Error</h2><p>Please refresh the page. If the problem persists, check your internet connection.</p></div></div>';
+              }
+            }
+          };
+          
+          script.onerror = () => {
+            console.error("Failed to load Google Maps script");
+            const mapContainer = document.getElementById("map");
+            if (mapContainer) {
+              mapContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: white; font-family: Inter, sans-serif;"><div><h2>Map Loading Error</h2><p>Failed to load Google Maps. Please check your API key configuration.</p></div></div>';
             }
           };
           document.head.appendChild(script);
