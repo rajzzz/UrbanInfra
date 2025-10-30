@@ -6,7 +6,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SmartScape</title>
+    <title>Smartscape</title>
     <script>
       (async () => {
         try {
@@ -76,19 +76,60 @@
         }
       })();
     </script>
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" href="css/style.css?v=1.4" type="text/css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet" />
   </head>
   <body>
+    <style>
+      /* Gray themed left nav to match results page */
+      .side-panel {
+        background: #f1f5f9;
+        border-right: 1px solid rgba(0, 0, 0, 0.06);
+        padding: 0 18px 18px;
+      }
+      .side-logo { margin: 0 -18px 16px -18px !important; padding: 0 !important; position: sticky; top: 0; z-index: 2; }
+      .side-logo img { width: 100%; height: auto; display: block; }
+
+      /* Typography colors to fit light theme */
+      .side-panel h4 { color: #22c1d6; margin: 0 0 8px 0; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+      .side-panel p, .side-panel label, .side-panel .muted { color: #334155; }
+
+      /* Search box light styling */
+      .side-panel .search-box input {
+        width: 100%;
+        padding: 10px 12px;
+        background: #ffffff;
+        border: 1px solid rgba(0,0,0,0.15);
+        border-radius: 8px;
+        color: #0b1220;
+      }
+      .side-panel .search-box input::placeholder { color: #94a3b8; }
+      .side-panel .suggestions { background: #ffffff; border: 1px solid rgba(0,0,0,0.12); color: #334155; }
+      .side-panel .suggestions[aria-hidden="true"],
+      .side-panel .suggestions:empty { display: none; }
+      .side-panel .suggestion-item { padding: 8px 10px; cursor: pointer; }
+      .side-panel .suggestion-item:hover, .side-panel .suggestion-item.active { background: #f1f5f9; }
+
+      /* Light theme overrides for Information card */
+      .side-panel .info-panel {
+        background: #ffffff !important;
+        border: 1px solid rgba(0,0,0,0.08) !important;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.06) !important;
+        color: #334155 !important;
+      }
+      .side-panel .info-panel h4 { color: #22c1d6 !important; border-bottom: 1px solid rgba(0,0,0,0.06) !important; }
+      .side-panel .info-panel .meta-row { border-bottom: 1px solid rgba(0,0,0,0.06) !important; }
+      .side-panel .info-panel .meta-label { color: #475569 !important; }
+      .side-panel .info-panel .meta-value { color: #0b1220 !important; }
+      .side-panel .info-panel .muted { color: #94a3b8 !important; }
+    </style>
     <div class="app-root">
       <aside class="side-panel" id="side-panel">
         <div class="side-top">
-          <div id="title-card">
-            <h1>Delhi Administrative Boundaries</h1>
-            <p>An interactive map of districts and wards</p>
+          <div class="side-logo" style="display:flex;align-items:center;justify-content:center;padding:0;margin:0 -18px 16px -18px;position:sticky;top:0;z-index:2;">
+            <img src="/css/images/logo.png" alt="Logo" style="width:100%;height:auto;display:block;" />
           </div>
 
           <div class="search-box">
@@ -97,13 +138,9 @@
             <div id="search-suggestions" class="suggestions" aria-hidden="true"></div>
           </div>
 
-          <div id="map-controls">
-            <span class="control-label">Satellite View</span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="map-type-toggle" />
-              <span class="slider round"></span>
-            </label>
-          </div>
+          <p class="muted" style="margin:8px 0 0 0; color:#334155; font-size:0.9rem;">Hover or select a ward to see details</p>
+
+          
         </div>
 
         <div class="side-bottom info-panel" id="side-info">

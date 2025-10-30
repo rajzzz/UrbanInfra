@@ -316,7 +316,7 @@ body {
 .suggestion-item {
   padding: 8px 10px;
   cursor: pointer;
-  color: #d9eaf8;
+  color: #333; 
   font-size: 0.92rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.01);
 }
