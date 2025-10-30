@@ -67,49 +67,14 @@
         display: block;
       }
       
-      .hamburger-menu {
-        display: none;
-        position: fixed;
-        top: 16px;
-        left: 16px;
-        z-index: 1001;
-        background: rgba(0, 0, 0, 0.05);
-        border: 1px solid rgba(0, 0, 0, 0.1);
-        border-radius: 8px;
-        width: 44px;
-        height: 44px;
-        cursor: pointer;
-        align-items: center;
-        justify-content: center;
-        backdrop-filter: blur(10px);
-        transition: all 0.3s ease;
-      }
-      
-      .hamburger-menu:hover {
-        background: rgba(0, 0, 0, 0.08);
-      }
-      
-      .hamburger-menu span {
-        display: block;
-        width: 24px;
-        height: 2px;
-        background: #0b1220;
-        margin: 5px 0;
-        transition: all 0.3s ease;
-        border-radius: 1px;
-      }
-      
-      .hamburger-menu.active span:nth-child(1) {
-        transform: rotate(45deg) translate(7px, 7px);
-      }
-      
-      .hamburger-menu.active span:nth-child(2) {
-        opacity: 0;
-      }
-      
-      .hamburger-menu.active span:nth-child(3) {
-        transform: rotate(-45deg) translate(7px, -7px);
-      }
+      /* Mobile header + static hamburger */
+      .hamburger-menu { display: none; position: fixed; top: 12px; left: 12px; z-index: 1001; background: transparent; border: none; width: 44px; height: 44px; cursor: pointer; align-items: center; justify-content: center; padding: 0; }
+      .hamburger-icon { width: 24px; height: 24px; display: block; }
+
+      .mobile-header { display: none; position: sticky; top: 0; background: #ffffff; border-bottom: 1px solid rgba(0,0,0,0.08); padding: 8px 12px; z-index: 1002; align-items: center; justify-content: space-between; }
+      .mobile-logo { height: 28px; width: auto; display: block; }
+      .mobile-back { display: none; flex: 1; justify-content: center; }
+      .mobile-back .back-btn { margin: 0; }
       
       .content-pane {
         flex: 1 1 auto;
@@ -795,9 +760,13 @@
       }
       
       @media (max-width: 768px) {
-        .hamburger-menu {
-          display: flex;
-        }
+        /* Allow full-page vertical scrolling on mobile */
+        body { overflow: auto; height: auto; }
+        .app-root { height: auto; }
+        .content-pane { overflow: visible; }
+        .dashboard-content { height: auto; overflow: visible; }
+        .mobile-header { display: flex; }
+        .hamburger-menu { display: flex; position: static; background: transparent; border: none; width: 40px; height: 40px; }
         
         .side-panel {
           position: fixed;
@@ -818,18 +787,37 @@
           width: 100%;
           margin-left: 0;
         }
+        .side-panel .side-logo { display: none !important; }
+        .mobile-back { display: flex; }
+        .dashboard-header .back-btn { display: none; }
         
         .dashboard-header {
           padding: 10px 12px;
           padding-left: 60px;
           gap: 8px;
+          justify-content: flex-start; /* place items inline */
+          overflow-x: auto; /* allow horizontal scroll if needed */
+          -webkit-overflow-scrolling: touch;
+          white-space: nowrap;
         }
         
+        /* Inline (single-row) metadata strip on mobile */
         .header-metadata {
-          gap: 12px;
-          flex-direction: column;
-          align-items: flex-start;
+          display: flex;
+          flex-direction: row;
+          gap: 16px;
+          flex-wrap: nowrap;
+          align-items: center;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-gutter: stable both-edges;
+          width: auto; /* allow Back button to sit inline */
         }
+        .header-left { flex: 0 0 auto; }
+        .back-btn { flex: 0 0 auto; }
+        .header-meta-item { flex: 0 0 auto; }
+        .header-meta-label { font-size: 0.65rem; }
+        .header-meta-value { font-size: 0.9rem; }
         
         .header-meta-item {
           gap: 2px;
@@ -889,7 +877,15 @@
           font-size: 0.7rem;
         }
         
-        .insights-grid-top,
+        /* On mobile: make Greenery Score and Summary side by side */
+        .insights-grid-top {
+          gap: 8px;
+          grid-template-columns: repeat(2, 1fr);
+        }
+        /* Population Context and AI Observations full width below */
+        .insights-grid-top > .insight-card:nth-child(n+3) {
+          grid-column: 1 / -1;
+        }
         .insights-grid-bottom {
           gap: 8px;
           grid-template-columns: 1fr;
@@ -937,11 +933,21 @@
         .construction-form input {
           padding: 8px;
           font-size: 0.75rem;
+          width: 90%;
+          max-width: 420px;
         }
         
         .construction-form button {
           padding: 8px;
           font-size: 0.75rem;
+          width: 90%;
+          max-width: 420px;
+        }
+        /* Stack input and button vertically to prevent overflow */
+        .construction-form div {
+          flex-direction: column;
+          align-items: flex-start; /* left align narrower controls */
+          gap: 6px;
         }
         
         .side-panel-satellite {
@@ -1128,12 +1134,21 @@
     </script>
   </head>
   <body>
-    <div class="app-root">
-      <div class="hamburger-menu" id="hamburger-menu" aria-label="Toggle menu">
-        <span></span>
-        <span></span>
-        <span></span>
+    <!-- Mobile Header -->
+    <div class="mobile-header" id="mobile-header">
+      <img src="/css/images/logo.png" alt="Logo" class="mobile-logo" />
+      <div class="mobile-back">
+        <a href="{{ url_for('main.home') }}" class="back-btn">← Back to Map</a>
       </div>
+      <button class="hamburger-menu" id="hamburger-menu" aria-label="Toggle menu">
+        <svg class="hamburger-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="6" width="18" height="2" rx="1" fill="#0b1220"/>
+          <rect x="3" y="11" width="18" height="2" rx="1" fill="#0b1220"/>
+          <rect x="3" y="16" width="18" height="2" rx="1" fill="#0b1220"/>
+        </svg>
+      </button>
+    </div>
+    <div class="app-root">
       <div class="side-panel-overlay" id="side-panel-overlay"></div>
       <aside class="side-panel" id="side-panel">
         <div class="side-logo">
