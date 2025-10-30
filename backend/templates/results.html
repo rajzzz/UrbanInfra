@@ -2,276 +2,1352 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
     <title>Ward Insights - Delhi Urban Analysis</title>
-    <link rel="stylesheet" href="{{ url_for('main.serve_css', path='style.css') }}?v=1.3" type="text/css" />
+    <link rel="stylesheet" href="{{ url_for('main.serve_css', path='style.css') }}?v=1.5" type="text/css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/modern-css-reset@1.4.0/dist/reset.min.css" />
     <style>
+      * {
+        box-sizing: border-box;
+      }
+      
       body {
         font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-        background: #f4f6f8;
-        color: #0b1f33;
+        background: #0a0e27;
+        color: #e6eef8;
         margin: 0;
         padding: 0;
-        min-height: 100vh;
+        height: 100vh;
+        overflow: hidden;
       }
+      
+      .app-root {
+        display: flex;
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+        position: relative;
+      }
+      
+      .side-panel {
+        width: 320px;
+        min-width: 260px;
+        max-width: 360px;
+        background: #f1f5f9; /* light gray navbar to match content background */
+        border-right: 1px solid rgba(0, 0, 0, 0.06);
+        padding: 0 18px 18px; /* remove top padding so logo can touch top */
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        z-index: 1000;
+        overflow-y: auto;
+        transition: transform 0.3s ease-in-out;
+      }
+      
+      .side-panel-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 999;
+        backdrop-filter: blur(4px);
+      }
+      
+      .side-panel-overlay.active {
+        display: block;
+      }
+      
+      .hamburger-menu {
+        display: none;
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        z-index: 1001;
+        background: rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        width: 44px;
+        height: 44px;
+        cursor: pointer;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+      }
+      
+      .hamburger-menu:hover {
+        background: rgba(0, 0, 0, 0.08);
+      }
+      
+      .hamburger-menu span {
+        display: block;
+        width: 24px;
+        height: 2px;
+        background: #0b1220;
+        margin: 5px 0;
+        transition: all 0.3s ease;
+        border-radius: 1px;
+      }
+      
+      .hamburger-menu.active span:nth-child(1) {
+        transform: rotate(45deg) translate(7px, 7px);
+      }
+      
+      .hamburger-menu.active span:nth-child(2) {
+        opacity: 0;
+      }
+      
+      .hamburger-menu.active span:nth-child(3) {
+        transform: rotate(-45deg) translate(7px, -7px);
+      }
+      
       .content-pane {
         flex: 1 1 auto;
         position: relative;
         min-width: 0;
-        overflow-y: auto;
-        background: #f4f6f8;
+        overflow: hidden;
+        background: #f6f8fb;
+        display: flex;
+        flex-direction: column;
       }
-      .content-inner {
-        width: min(960px, 100%);
-        margin: 64px auto;
-        padding: 0 16px;
+      
+      .dashboard-header {
+        padding: 16px 24px;
         background: #ffffff;
-        border-radius: 18px;
-        box-shadow: 0 22px 45px -24px rgba(15, 37, 61, 0.3);
-        padding: 32px clamp(24px, 4vw, 48px);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        backdrop-filter: blur(10px);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
       }
-      header {
-        margin-bottom: 28px;
+      
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        flex: 1;
       }
-      h1 {
+      
+      .dashboard-header h1 {
         margin: 0;
-        font-size: clamp(1.8rem, 2.2vw, 2.4rem);
-        color: #0c3d64;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #0b1220;
+        display: flex;
+        align-items: center;
+        gap: 12px;
       }
-      p.lead {
-        margin-top: 12px;
-        color: #4c5d6c;
-        line-height: 1.5;
+      
+      .header-metadata {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
       }
-      form {
-        display: grid;
-        gap: 18px;
+      
+      .header-meta-item {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
       }
-      label {
+      
+      .header-meta-label {
+        font-size: 0.75rem;
+        color: #22c1d6;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 700;
+      }
+      
+      .header-meta-value {
+        font-size: 1rem;
+        color: #334155;
         font-weight: 600;
-        color: #15324c;
       }
-      textarea,
-      input,
-      select {
+      
+      .dashboard-header .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        border-radius: 8px;
+        color: #0b1220;
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s;
+        white-space: nowrap;
+      }
+      
+      .dashboard-header .back-btn:hover {
+        background: rgba(0, 0, 0, 0.08);
+        transform: translateX(-2px);
+      }
+      
+      .dashboard-content {
+        flex: 1;
+        padding: 12px 16px;
+        overflow: hidden;
+        display: grid;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        gap: 12px;
+        height: calc(100vh - 80px);
+      }
+      
+      .main-panel {
+        display: none;
+      }
+      
+      .insights-wrapper {
+        grid-column: 1 / -1;
+        grid-row: 1 / -1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .side-panel-satellite {
+        background: #ffffff;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 10px;
+        padding: 12px;
+        margin-bottom: 10px;
+        backdrop-filter: blur(10px);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      
+      /* Increase specificity to override external styles */
+      .side-panel .side-panel-satellite h4 {
+        margin: 0 0 6px 0;
+        font-size: 0.8rem !important;
+        font-weight: 600;
+        color: #22c1d6 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        text-align: center;
         width: 100%;
-        padding: 12px 14px;
-        border-radius: 12px;
-        border: 1px solid #d1d9e0;
-        background: #faffff;
-        font-size: 0.95rem;
       }
-      input[type="file"] {
-        padding: 12px 0;
-        border: none;
+      
+      .side-panel-satellite img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        display: block;
+      }
+
+      .side-logo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        margin: 0 -18px 16px -18px; /* bleed to edges, start at very top */
+        position: sticky;
+        top: 0;
+        z-index: 2;
         background: transparent;
       }
-      button {
-        justify-self: start;
-        background: linear-gradient(135deg, #166086, #1983a1);
-        color: white;
-        border: none;
+
+      .side-logo img {
+        max-width: none;
+        width: 100%;
+        height: auto;
+        display: block;
+        filter: none; /* no borders/shadows around logo */
+      }
+      
+      .score-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      
+      .score-card {
+        background: #ffffff;
+        border: 1px solid rgba(0, 0, 0, 0.08);
         border-radius: 12px;
-        padding: 12px 26px;
+        padding: 12px;
+        text-align: center;
+        backdrop-filter: blur(10px);
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 160px;
+      }
+      
+      .speedometer-container {
+        position: relative;
+        width: 160px;
+        height: 90px;
+        margin: 0 auto 8px;
+      }
+      
+      .speedometer-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 140px; /* ensures vertical centering room for the donut */
+        width: 100%;
+      }
+
+      .score-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 220px;
+        width: 100%;
+        gap: 6px;
+      }
+      
+      .speedometer-base {
+        width: 160px;
+        height: 80px;
+        position: relative;
+        overflow: hidden;
+      }
+      
+      .speedometer-track {
+        width: 160px;
+        height: 160px;
+        border-radius: 50%;
+        border: 12px solid rgba(59, 130, 246, 0.5); /* clearer outline for empty arc (blue) */
+        border-bottom-color: transparent;
+        border-left-color: transparent;
+        border-right-color: transparent;
+        border-top-color: rgba(59, 130, 246, 0.7) !important; /* force blue visible arc */
+        position: absolute;
+        top: 0;
+        left: 0;
+        transform: rotate(-135deg);
+        z-index: 1;
+      }
+      
+      .speedometer-fill {
+        width: 160px;
+        height: 160px;
+        border-radius: 50%;
+        border: 12px solid;
+        border-bottom-color: transparent;
+        border-left-color: transparent;
+        border-right-color: transparent;
+        position: absolute;
+        top: 0;
+        left: 0;
+        transform: rotate(-135deg);
+        transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 2;
+      }
+      
+      .speedometer-needle {
+        display: none;
+      }
+      
+      .score-value {
+        position: absolute;
+        left: 50%;
+        top: 58%;
+        transform: translate(-50%, -50%);
+        font-size: 2rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin: 0;
+        line-height: 1;
+        z-index: 4;
+        text-align: center;
+        width: 100%;
+        pointer-events: none;
+      }
+      
+      .score-label {
+        font-size: 0.85rem;
+        color: #9fb0c8;
+        margin-top: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      
+      .score-district-label {
+        font-size: 0.8rem;
+        color: #cfe3f5;
         font-weight: 600;
-        cursor: pointer;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        margin-bottom: 6px;
+        text-align: center;
+        width: 100%;
       }
-      button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 12px 24px -18px rgba(16, 73, 112, 0.8);
-      }
-      .metrics {
-        display: grid;
-        gap: 16px;
-      }
-      .card {
-        padding: 18px 22px;
-        border-radius: 16px;
-        border: 1px solid rgba(18, 56, 90, 0.08);
-        background: linear-gradient(135deg, rgba(19, 85, 130, 0.05), #ffffff);
-      }
-      .card h2 {
-        font-size: 1.1rem;
-        margin-bottom: 10px;
-        color: #124362;
-      }
-      .meta-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 14px;
-      }
-      .meta-item {
+      
+      .summary-card {
+        background: #ffffff;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 10px;
         padding: 14px;
-        border-radius: 14px;
-        background: rgba(16, 98, 123, 0.07);
+        font-size: 0.9rem;
+        line-height: 1.4;
+        color: #334155;
       }
+      
+      .insights-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        overflow: hidden;
+        flex: 1;
+      }
+
+      /* Two-row structure */
+      .insights-grid-top {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .insights-grid-bottom {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      
+      .insight-card {
+        background: #ffffff;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 10px;
+        padding: 16px;
+        backdrop-filter: blur(10px);
+        transition: transform 0.2s, border-color 0.2s;
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .insight-card:hover {
+        transform: scale(1.01);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+      }
+      
+      .insight-card h3 {
+        margin: 0 0 8px 0;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #22c1d6;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      
+      .insight-card ul {
+        margin: 0;
+        padding-left: 16px;
+        color: #334155;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        overflow: hidden;
+        flex: 1;
+      }
+      
+      .insight-card ul li {
+        margin-bottom: 4px;
+      }
+      
+      .insight-card p {
+        margin: 0;
+        color: #334155;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        overflow: hidden;
+        flex: 1;
+      }
+      
+      /* Tree suggestion cards */
+      .tree-grid {
+        display: grid;
+        grid-auto-flow: column; /* force a single row */
+        grid-auto-columns: minmax(220px, 1fr); /* each item becomes a column */
+        gap: 10px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+      }
+
+      .tree-card {
+        background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+        border: 1px solid rgba(34, 193, 214, 0.25);
+        border-radius: 12px;
+        padding: 14px;
+        box-shadow: none;
+        transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .tree-card:hover {
+        transform: scale(1.01);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+      }
+
+      .tree-card-title {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #ffffff;
+        margin: 0 0 2px 0;
+      }
+
+      .tree-card-body {
+        font-size: 0.9rem;
+        color: #cfe3f5;
+        line-height: 1.35;
+      }
+
+      .tree-card-icon {
+        font-size: 28px;
+        line-height: 1;
+        text-align: center;
+        margin-bottom: 6px;
+      }
+
+      /* Scrollable AI observations list */
+      .observations-card {
+        display: flex;
+        flex-direction: column;
+      }
+      .observations-list {
+        max-height: 280px;
+        padding-right: 6px;
+        scrollbar-width: thin;
+      }
+      /* Increase specificity and force scroll to override earlier ul rule */
+      .insight-card .observations-list {
+        overflow-y: scroll !important; /* always show vertical scrollbar when scrollable */
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-gutter: stable both-edges; /* keeps layout stable when scrollbar appears */
+        display: block;
+      }
+
+      /* Custom scrollbar styling */
+      .insight-card .observations-list::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      .insight-card .observations-list::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.06);
+        border-radius: 8px;
+      }
+      .insight-card .observations-list::-webkit-scrollbar-thumb {
+        background: rgba(34, 193, 214, 0.6);
+        border-radius: 8px;
+      }
+      .insight-card .observations-list::-webkit-scrollbar-thumb:hover {
+        background: rgba(34, 193, 214, 0.8);
+      }
+
+      
+      .construction-form {
+        background: #ffffff;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 10px;
+        padding: 16px;
+        backdrop-filter: blur(10px);
+      }
+      .construction-form:hover { box-shadow: 0 10px 24px rgba(0,0,0,0.08); transform: scale(1.01); }
+      
+      .construction-form h3 {
+        margin: 0 0 6px 0;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #22c1d6;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      
+      .construction-form p {
+        margin: 0 0 8px 0;
+        font-size: 0.85rem;
+        color: #64748b;
+        line-height: 1.3;
+      }
+      
+      .construction-form input {
+        width: 100%;
+        padding: 8px 10px;
+        background: #ffffff;
+        border: 1px solid rgba(0, 0, 0, 0.15);
+        border-radius: 6px;
+        color: #0b1220;
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+        box-sizing: border-box;
+      }
+      
+      .construction-form input::placeholder {
+        color: #94a3b8;
+      }
+      
+      .construction-form button {
+        width: 100%;
+        padding: 8px;
+        background: linear-gradient(135deg, #22c1d6, #10a5c8);
+        border: none;
+        border-radius: 6px;
+        color: #ffffff;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      
+      .construction-form button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(34, 193, 214, 0.4);
+      }
+      
+      .construction-form div {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      
+      .recommendations-card {
+        background: #ffffff;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 10px;
+        padding: 16px;
+        backdrop-filter: blur(10px);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .recommendations-card:hover { box-shadow: 0 10px 24px rgba(0,0,0,0.08); transform: scale(1.01); }
+      
+      .recommendations-card h3 {
+        margin: 0 0 8px 0;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #22c1d6;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      
+      .recommendations-card .markdown-body {
+        color: #334155;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        overflow: hidden;
+        flex: 1;
+      }
+
+      /* Modal for recommendations */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.45);
+        backdrop-filter: blur(4px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+      }
+      .modal-overlay.active { display: flex; }
+      .modal-card {
+        background: #ffffff;
+        width: min(900px, 92vw);
+        max-height: 80vh;
+        border-radius: 14px;
+        border: 1px solid rgba(0,0,0,0.08);
+        box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        border-bottom: 1px solid rgba(0,0,0,0.08);
+      }
+      .modal-title { 
+        margin: 0; font-size: 1rem; font-weight: 700; color: #0b1220; text-transform: uppercase; letter-spacing: .5px;
+      }
+      .modal-close {
+        appearance: none; border: 0; background: transparent; cursor: pointer; font-size: 20px; color: #475569;
+      }
+      .modal-body {
+        padding: 16px 18px;
+        overflow: auto;
+      }
+      .modal-body .markdown-body { font-size: 0.95rem; line-height: 1.55; color: #334155; }
+
+      /* Loading overlay for recommendation generation */
+      .recommend-loader-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(255,255,255,0.8);
+        backdrop-filter: blur(2px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1900;
+      }
+      .recommend-loader-overlay.active { display: flex; }
+      .recommend-loader-card {
+        background: #ffffff;
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: 12px;
+        padding: 16px 18px;
+        width: min(520px, 92vw);
+        box-shadow: 0 18px 40px rgba(0,0,0,0.15);
+      }
+      .recommend-loader-title { margin: 0 0 10px 0; font-weight: 700; color: #0b1220; }
+      .recommend-progress {
+        width: 100%;
+        height: 8px;
+        background: #e2e8f0;
+        border-radius: 9999px;
+        overflow: hidden;
+      }
+      .recommend-progress-bar {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(135deg, #22c1d6, #10a5c8);
+        border-radius: 9999px;
+        animation: loaderIndeterminate 1.2s infinite ease-in-out;
+      }
+      @keyframes loaderIndeterminate {
+        0% { width: 10%; transform: translateX(0%); }
+        50% { width: 60%; transform: translateX(40%); }
+        100% { width: 10%; transform: translateX(100%); }
+      }
+      
       .flash {
         padding: 12px 16px;
-        border-radius: 12px;
-        background: rgba(204, 48, 58, 0.12);
-        color: #9f1d2a;
-        margin-bottom: 18px;
+        border-radius: 8px;
+        background: rgba(239, 68, 68, 0.08);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #b91c1c;
+        margin-bottom: 16px;
+        font-size: 0.9rem;
       }
-      ul {
-        padding-left: 20px;
+      
+      .section-title {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #ffffff;
+        margin: 0 0 8px 0;
       }
-      .trees-list li {
-        margin-bottom: 8px;
+      
+      @media (max-width: 1400px) {
+        .dashboard-content {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto 1fr;
+        }
+        
+        .insights-wrapper {
+          grid-column: 1 / -1;
+          grid-row: 1 / -1;
+        }
+        
+        .insights-grid-top {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .insights-grid-bottom {
+          grid-template-columns: 1fr;
+        }
+        
+        .dashboard-header {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        
+        .header-left {
+          width: 100%;
+        }
+        
+        .header-metadata {
+          width: 100%;
+          justify-content: flex-start;
+        }
       }
-      footer {
-        margin-top: 36px;
-        font-size: 0.85rem;
-        color: #688195;
-        text-align: center;
+      
+      @media (max-width: 768px) {
+        .hamburger-menu {
+          display: flex;
+        }
+        
+        .side-panel {
+          position: fixed;
+          top: 0;
+          left: 0;
+          height: 100vh;
+          width: 280px;
+          max-width: 85vw;
+          transform: translateX(-100%);
+          box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+        }
+        
+        .side-panel.active {
+          transform: translateX(0);
+        }
+        
+        .content-pane {
+          width: 100%;
+          margin-left: 0;
+        }
+        
+        .dashboard-header {
+          padding: 10px 12px;
+          padding-left: 60px;
+          gap: 8px;
+        }
+        
+        .header-metadata {
+          gap: 12px;
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        
+        .header-meta-item {
+          gap: 2px;
+        }
+        
+        .header-meta-label {
+          font-size: 0.6rem;
+        }
+        
+        .header-meta-value {
+          font-size: 0.8rem;
+        }
+        
+        .dashboard-content {
+          padding: 10px 12px;
+          gap: 10px;
+          height: calc(100vh - 70px);
+        }
+        
+        .main-panel {
+          gap: 8px;
+        }
+        
+        .score-card {
+          min-height: 140px;
+          padding: 10px;
+        }
+        
+        .speedometer-container {
+          width: 140px;
+          height: 75px;
+        }
+        
+        .speedometer-base {
+          width: 140px;
+          height: 70px;
+        }
+        
+        .speedometer-track,
+        .speedometer-fill {
+          width: 140px;
+          height: 140px;
+          border-width: 10px;
+        }
+        
+        .score-value {
+          font-size: 1.5rem;
+          bottom: 12px;
+        }
+        
+        .score-label {
+          font-size: 0.65rem;
+        }
+        
+        .summary-card {
+          padding: 8px;
+          font-size: 0.7rem;
+        }
+        
+        .insights-grid-top,
+        .insights-grid-bottom {
+          gap: 8px;
+          grid-template-columns: 1fr;
+        }
+        
+        .insight-card {
+          padding: 10px;
+        }
+        
+        .insight-card h3 {
+          font-size: 0.7rem;
+          margin-bottom: 6px;
+        }
+        
+        .insight-card ul,
+        .insight-card p {
+          font-size: 0.7rem;
+          line-height: 1.3;
+        }
+        
+        .recommendations-card {
+          padding: 10px;
+        }
+        
+        .recommendations-card h3 {
+          font-size: 0.7rem;
+        }
+        
+        .recommendations-card .markdown-body {
+          font-size: 0.7rem;
+        }
+        
+        .construction-form {
+          padding: 10px;
+        }
+        
+        .construction-form h3 {
+          font-size: 0.7rem;
+        }
+        
+        .construction-form p {
+          font-size: 0.65rem;
+        }
+        
+        .construction-form input {
+          padding: 8px;
+          font-size: 0.75rem;
+        }
+        
+        .construction-form button {
+          padding: 8px;
+          font-size: 0.75rem;
+        }
+        
+        .side-panel-satellite {
+          padding: 8px;
+        }
+        
+        .side-panel-satellite img {
+          height: 150px;
+        }
+        
+        .back-btn {
+          padding: 8px 12px;
+          font-size: 0.75rem;
+        }
       }
-      .back-link {
-        display: inline-block;
-        margin-top: 24px;
-        color: #166086;
-        text-decoration: none;
-        font-weight: 500;
-      }
-      .back-link:hover {
-        text-decoration: underline;
+      
+      @media (max-width: 480px) {
+        .dashboard-header {
+          padding-left: 56px;
+        }
+        
+        .header-metadata {
+          gap: 8px;
+        }
+        
+        .dashboard-content {
+          padding: 8px 10px;
+        }
+        
+        .score-card {
+          min-height: 120px;
+        }
+        
+        .speedometer-container {
+          width: 120px;
+          height: 65px;
+        }
+        
+        .speedometer-base {
+          width: 120px;
+          height: 60px;
+        }
+        
+        .speedometer-track,
+        .speedometer-fill {
+          width: 120px;
+          height: 120px;
+        }
+        
+        .score-value {
+          font-size: 1.3rem;
+        }
       }
     </style>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // Hamburger menu functionality
+        const hamburgerMenu = document.getElementById('hamburger-menu');
+        const sidePanel = document.getElementById('side-panel');
+        const overlay = document.getElementById('side-panel-overlay');
+        
+        function toggleMenu() {
+          sidePanel.classList.toggle('active');
+          hamburgerMenu.classList.toggle('active');
+          overlay.classList.toggle('active');
+        }
+        
+        if (hamburgerMenu) {
+          hamburgerMenu.addEventListener('click', toggleMenu);
+        }
+        
+        if (overlay) {
+          overlay.addEventListener('click', toggleMenu);
+        }
+        
+        // Close menu on escape key
+        document.addEventListener('keydown', function(e) {
+          if (e.key === 'Escape' && sidePanel.classList.contains('active')) {
+            toggleMenu();
+          }
+        });
+        
+        // Score animation and speedometer
+        const scoreElement = document.getElementById('score-display');
+        const fillElement = document.getElementById('speedometer-fill');
+        
+        if (scoreElement && fillElement) {
+          const scoreText = scoreElement.textContent.trim();
+          let score = parseFloat(scoreText);
+          
+          if (isNaN(score) || scoreText === 'N/A') {
+            score = 0;
+          }
+          
+          // Clamp score between 0 and 100
+          score = Math.max(0, Math.min(100, score));
+          
+          // Calculate angle: -135deg to 135deg = 270deg range
+          // Score 0 = -135deg, Score 100 = 135deg
+          const minAngle = -135;
+          const maxAngle = 135;
+          const angleRange = maxAngle - minAngle;
+          const angle = minAngle + (score / 100) * angleRange;
+          
+          // Calculate gradient colors based on score
+          let borderColor = '#22c55e'; // Default green
+          if (score < 30) {
+            borderColor = '#ef4444'; // Red for low
+          } else if (score < 60) {
+            borderColor = '#f59e0b'; // Orange for medium
+          } else if (score < 80) {
+            borderColor = '#84cc16'; // Yellow-green for good
+          } else {
+            borderColor = '#22c55e'; // Green for excellent
+          }
+          
+          // Set the fill arc
+          fillElement.style.borderTopColor = borderColor;
+          fillElement.style.transform = `rotate(${angle}deg)`;
+          
+          // Set the score number color to match the indicator
+          scoreElement.style.color = borderColor;
+          scoreElement.style.background = 'none';
+          scoreElement.style.webkitTextFillColor = borderColor;
+
+          // Also set the ward label color to match
+          const wardLabel = document.getElementById('score-ward-label');
+          if (wardLabel) {
+            wardLabel.style.color = borderColor;
+          }
+          
+          // Animate the score value
+          let currentScore = 0;
+          const duration = 1500;
+          const startTime = Date.now();
+          
+          const animate = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            currentScore = Math.floor(score * progress);
+            scoreElement.textContent = currentScore;
+            
+            if (progress < 1) {
+              requestAnimationFrame(animate);
+            } else {
+              scoreElement.textContent = Math.floor(score);
+            }
+          };
+          
+          animate();
+        }
+
+        // Recommendations modal
+        const modal = document.getElementById('recommendation-modal');
+        const modalClose = document.getElementById('recommendation-modal-close');
+        if (modal) {
+          const openModal = () => { modal.classList.add('active'); modal.setAttribute('aria-hidden', 'false'); };
+          const closeModal = () => { 
+            modal.classList.remove('active'); 
+            modal.setAttribute('aria-hidden', 'true'); 
+            // Refresh the page after closing the modal to reset transient content
+            window.location.reload();
+          };
+          if (modal.dataset.active === 'true') {
+            openModal();
+          }
+          if (modalClose) modalClose.addEventListener('click', closeModal);
+          modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+          document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.classList.contains('active')) closeModal(); });
+        }
+
+        // Show loading overlay on recommendations form submit
+        const recommendForm = document.getElementById('recommendation-form');
+        if (recommendForm) {
+          const loader = document.getElementById('recommend-loader');
+          recommendForm.addEventListener('submit', (e) => {
+            // Ensure loader paints before navigation
+            if (loader) loader.classList.add('active');
+            e.preventDefault();
+            setTimeout(() => recommendForm.submit(), 30);
+          });
+        }
+      });
+    </script>
   </head>
   <body>
     <div class="app-root">
+      <div class="hamburger-menu" id="hamburger-menu" aria-label="Toggle menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+      <div class="side-panel-overlay" id="side-panel-overlay"></div>
       <aside class="side-panel" id="side-panel">
-        <div class="side-top">
-          <div id="title-card">
-            <h1>Delhi Administrative Boundaries</h1>
-            <p>An interactive map of districts and wards</p>
-          </div>
-
-          <div class="search-box">
-            <label for="ward-search" class="visually-hidden">Search ward</label>
-            <input id="ward-search" type="search" placeholder="Search ward or ward number..." autocomplete="off" />
-            <div id="search-suggestions" class="suggestions" aria-hidden="true"></div>
-          </div>
-
-          <div id="map-controls">
-            <span class="control-label">Satellite View</span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="map-type-toggle" />
-              <span class="slider round"></span>
-            </label>
-          </div>
+        <div class="side-logo">
+          <img src="/css/images/logo.png" alt="Logo" />
         </div>
+        
 
         <div class="side-bottom info-panel" id="side-info">
+          {% if image_url %}
+          <div class="side-panel-satellite">
+            <h4>Satellite Snapshot</h4>
+            <img src="{{ image_url }}" alt="Satellite view of ward" />
+          </div>
+          {% elif image_error %}
+          <div class="side-panel-satellite">
+            <h4>Satellite Snapshot</h4>
+            <p style="color: #9fb0c8; margin: 0; font-size: 0.85rem;">{{ image_error }}</p>
+          </div>
+          {% endif %}
+          
           <div class="info-panel">
-            <h4>Navigation</h4>
-            <p class="muted">View ward insights and analysis results</p>
-            <a href="{{ url_for('main.home')}}" class="analyze-btn" style="text-decoration: none; display: block; text-align: center;">Back to Map</a>
+            <a href="{{ url_for('main.home') }}" class="analyze-btn" style="text-decoration: none; display: block; text-align: center;">Back to Map</a>
           </div>
         </div>
       </aside>
 
       <main class="content-pane">
-        <div class="content-inner">
-          {% if get_flashed_messages(with_categories=true) %} 
-            {% for category, message in get_flashed_messages(with_categories=true) %}
-            <div class="flash">{{ message }}</div>
-            {% endfor %} 
-          {% endif %} 
-          
-          <header>
-            <h1>Ward Insights</h1>
-            <p class="lead">Greenery, population context, and nature-based suggestions for this ward. Review the findings and tell us what kind of construction you'd like to plan next.</p>
-          </header>
-          
-          <section class="metrics">
-            <div class="card">
-              <h2>Satellite Snapshot</h2>
-              {% if image_url %}
-              <img src="{{ image_url }}" alt="Satellite view of ward" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08)" />
-              {% elif image_error %}
-              <p style="margin: 0">{{ image_error }}</p>
-              {% else %}
-              <p style="margin: 0">Satellite snapshot unavailable for this ward.</p>
-              {% endif %}
-            </div>
-            <div class="card">
-              <h2>Greenery Score</h2>
-              <p style="font-size: 2.4rem; font-weight: 700; color: #0a6f4f">{{ greenery.greenery_score if greenery else 'N/A' }}</p>
-              <p>{{ greenery.greenery_summary }}</p>
-            </div>
-            <div class="card">
-              <h2>Population Context</h2>
-              <p>{{ greenery.population_context }}</p>
-            </div>
-            <div class="card">
-              <h2>AI Observations</h2>
-              <ul>
-                {% for note in greenery.observations %}
-                <li>{{ note }}</li>
-                {% else %}
-                <li>No observations returned.</li>
-                {% endfor %}
-              </ul>
-            </div>
-            <div class="card">
-              <h2>Tree Planting Ideas</h2>
-              <ul class="trees-list">
-                {% if tree_suggestions_html %}
-                  {% for tree_html in tree_suggestions_html %}
-                    <li>{{ tree_html|safe }}</li>
-                  {% else %}
-                    <li>No tree suggestions available.</li>
-                  {% endfor %}
-                {% else %}
-                  {% for tree in tree_suggestions %}
-                    <li>{{ tree }}</li>
-                  {% else %}
-                    <li>No tree suggestions available.</li>
-                  {% endfor %}
-                {% endif %}
-              </ul>
-            </div>
-          </section>
-
-          <section class="card" style="margin-top: 24px">
-            <h2>Ward Metadata</h2>
-            <div class="meta-grid">
+        <div class="dashboard-header">
+          <div class="header-left">
+            <div class="header-metadata">
               {% for key, value in metadata.items() if key not in ['coordinates', 'map_view', 'ward_geojson'] %}
-              <div class="meta-item">
-                <strong>{{ key|replace('_', ' ')|title }}</strong>
-                <div style="margin-top: 6px">{{ value }}</div>
-              </div>
+              {% set key_lower = key|lower %}
+              {% if key_lower == 'districtname' %}
+                {% set display_key = 'District Name' %}
+              {% elif key_lower == 'wardname' %}
+                {% set display_key = 'Ward Name' %}
+              {% elif key_lower == 'wardnumber' %}
+                {% set display_key = 'Ward Number' %}
               {% else %}
-              <p>No metadata provided.</p>
+                {% set display_key = (key|replace('_', ' ')|title) %}
+              {% endif %}
+              <div class="header-meta-item">
+                <div class="header-meta-label">{{ display_key }}</div>
+                <div class="header-meta-value">{{ value }}</div>
+              </div>
               {% endfor %}
             </div>
-          </section>
+          </div>
+          <a href="{{ url_for('main.home') }}" class="back-btn">← Back to Map</a>
+        </div>
 
-          <form action="{{ url_for('main.recommend') }}" method="post" class="card" style="margin-top: 28px">
-            <h2>Need a construction plan?</h2>
-            <p style="color: #3f5665; line-height: 1.5">Tell us what you're planning to build. We'll combine the greenery insights, SDG 11 targets, and DDA rules to suggest micro-locations and next steps.</p>
-            <label for="construction_type">Construction type</label>
-            <input id="construction_type" type="text" name="construction_type" placeholder="e.g., community clinic, senior housing, riverfront park" required value="{{ construction_type or '' }}" />
-            <button type="submit">Generate recommendations</button>
-          </form>
-
-          {% if recommendations_html %}
-          <section class="card" style="margin-top: 28px">
-            <h2>AI Construction Guidance</h2>
-            <div class="markdown-body">{{ recommendations_html|safe }}</div>
-          </section>
+        <div class="dashboard-content">
+          {% if get_flashed_messages(with_categories=true) %} 
+            {% for category, message in get_flashed_messages(with_categories=true) %}
+            <div class="flash" style="grid-column: 1 / -1;">{{ message }}</div>
+            {% endfor %} 
           {% endif %}
-
-          <a href="https://smartscape.onrender.com/" class="back-link">⬅ Back to Map</a>
-
           
-          <footer>Built for Delhi ward-level sustainable planning.</footer>
+          
+
+          <div class="insights-wrapper">
+            <div class="insights-grid-top">
+              <div class="insight-card">
+                <h3>Greenery Score</h3>
+                <div class="score-card" style="background: transparent; border: none; padding: 0; min-height: 0;">
+                  {# Try to resolve ward name from metadata dynamically #}
+                  {% set ward = namespace(name=None) %}
+                  {% for k, v in metadata.items() %}
+                    {% set key_lower = k|lower %}
+                    {% if 'ward' in key_lower and ('name' in key_lower or key_lower == 'ward') and not ward.name %}
+                      {% set ward.name = v %}
+                    {% endif %}
+                  {% endfor %}
+                  {# Fallbacks for common keys #}
+                  {% set ward_name = ward.name or metadata.get('ward_name') or metadata.get('Ward Name') or metadata.get('ward') or metadata.get('Ward') %}
+                  <div class="speedometer-wrapper">
+                    <div class="speedometer-container">
+                      <div class="speedometer-base">
+                        <div class="speedometer-track"></div>
+                        <div class="speedometer-fill" id="speedometer-fill"></div>
+                        <div class="speedometer-needle" id="speedometer-needle"></div>
+                  </div>
+                  <div class="score-value" id="score-display">{{ greenery.greenery_score if greenery else 'N/A' }}</div>
+                  <div class="score-district-label" id="score-ward-label">{{ ward_name or 'Ward' }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="insight-card">
+                <h3>Summary</h3>
+                <p>{{ greenery.greenery_summary if greenery else 'No summary available.' }}</p>
+              </div>
+
+              <div class="insight-card">
+                <h3>Population Context</h3>
+                <p>{{ greenery.population_context if greenery else 'No population data available.' }}</p>
+              </div>
+
+              <div class="insight-card observations-card">
+                <h3>AI Observations</h3>
+                {% if greenery and greenery.observations %}
+                <ul class="observations-list">
+                  {% for note in greenery.observations %}
+                  <li>{{ note }}</li>
+                  {% endfor %}
+                </ul>
+                {% else %}
+                <p>No observations available.</p>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="insights-grid-bottom">
+              <div class="insight-card">
+                <h3>Tree Planting Ideas</h3>
+                {% if tree_suggestions_html %}
+                <div class="tree-grid">
+                  {% for tree_html in tree_suggestions_html %}
+                  {% set html_lower = (tree_html|string)|lower %}
+                  {% set icon = '🌳' %}
+                  {% if 'neem' in html_lower %}{% set icon = '🌿' %}
+                  {% elif 'banyan' in html_lower or 'ficus benghalensis' in html_lower %}{% set icon = '🌲' %}
+                  {% elif 'mango' in html_lower or 'mangifera' in html_lower %}{% set icon = '🥭' %}
+                  {% elif 'peepal' in html_lower or 'ficus religiosa' in html_lower %}{% set icon = '🪴' %}
+                  {% elif 'gulmohar' in html_lower or 'delonix' in html_lower %}{% set icon = '🌺' %}
+                  {% elif 'ashoka' in html_lower or 'polyalthia' in html_lower %}{% set icon = '🌿' %}
+                  {% elif 'jamun' in html_lower or 'syzygium' in html_lower %}{% set icon = '🫐' %}
+                  {% endif %}
+                  <div class="tree-card">
+                    <div class="tree-card-icon">{{ icon }}</div>
+                    <div class="tree-card-body">{{ tree_html|safe }}</div>
+                  </div>
+                  {% else %}
+                  <div class="tree-card"><div class="tree-card-body">No tree suggestions available.</div></div>
+                  {% endfor %}
+                </div>
+                {% elif tree_suggestions %}
+                <div class="tree-grid">
+                  {% for tree in tree_suggestions %}
+                  {% set t = (tree|string) %}
+                  {% set tl = t|lower %}
+                  {% set icon = '🌳' %}
+                  {% if 'neem' in tl %}{% set icon = '🌿' %}
+                  {% elif 'banyan' in tl or 'ficus benghalensis' in tl %}{% set icon = '🌲' %}
+                  {% elif 'mango' in tl or 'mangifera' in tl %}{% set icon = '🥭' %}
+                  {% elif 'peepal' in tl or 'ficus religiosa' in tl %}{% set icon = '🪴' %}
+                  {% elif 'gulmohar' in tl or 'delonix' in tl %}{% set icon = '🌺' %}
+                  {% elif 'ashoka' in tl or 'polyalthia' in tl %}{% set icon = '🌿' %}
+                  {% elif 'jamun' in tl or 'syzygium' in tl %}{% set icon = '🫐' %}
+                  {% endif %}
+                  <div class="tree-card">
+                    <div class="tree-card-icon">{{ icon }}</div>
+                    <div class="tree-card-body">{{ t }}</div>
+                  </div>
+                  {% else %}
+                  <div class="tree-card"><div class="tree-card-body">No tree suggestions available.</div></div>
+                  {% endfor %}
+                </div>
+                {% else %}
+                <p>No tree suggestions available.</p>
+                {% endif %}
+              </div>
+
+              {% if recommendations_html %}
+              <!-- Modal trigger handled on load; inline card removed in favor of popup -->
+              {% endif %}
+
+              <form action="{{ url_for('main.recommend') }}" method="post" class="insight-card construction-form" id="recommendation-form" style="grid-column: 1 / -1;">
+                <h3>Construction Planning</h3>
+                <p>Tell us what you're planning to build for personalized recommendations.</p>
+                <div>
+                  <input 
+                    id="construction_type" 
+                    type="text" 
+                    name="construction_type" 
+                    placeholder="e.g., community clinic, senior housing, park" 
+                    required 
+                    value="{{ construction_type or '' }}"
+                  />
+                  <button type="submit">Generate Recommendations</button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
       </main>
+    </div>
+    
+    <!-- Recommendations Modal -->
+    <div class="modal-overlay" id="recommendation-modal" {% if recommendations_html %}data-active="true"{% endif %} aria-hidden="true" role="dialog" aria-label="AI Construction Guidance">
+      <div class="modal-card" role="document">
+        <div class="modal-header">
+          <h3 class="modal-title">AI Construction Guidance</h3>
+          <button class="modal-close" id="recommendation-modal-close" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+          {% if recommendations_html %}
+          <div class="markdown-body">{{ recommendations_html|safe }}</div>
+          {% else %}
+          <div class="markdown-body">No recommendations available.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading overlay while generating recommendations -->
+    <div class="recommend-loader-overlay" id="recommend-loader" aria-hidden="true">
+      <div class="recommend-loader-card" role="status" aria-live="polite">
+        <h4 class="recommend-loader-title">Generating recommendations…</h4>
+        <div class="recommend-progress">
+          <div class="recommend-progress-bar"></div>
+        </div>
+      </div>
     </div>
   </body>
 </html>
